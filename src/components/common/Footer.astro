@@ -1,0 +1,167 @@
+---
+import { SITE_NAME } from '../../config/site';
+
+const currentYear = new Date().getFullYear();
+const buildDate = new Intl.DateTimeFormat('ru-RU', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric'
+}).format(new Date());
+---
+
+<footer class="mt-12 min-[900px]:mt-16 border-t border-[var(--border)] bg-[var(--footer-bg)] text-[var(--footer-text)] text-xs min-[900px]:text-sm">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 min-[900px]:py-10">
+    <nav aria-label="Нижняя навигация" class="grid grid-cols-1 min-[900px]:grid-cols-4 gap-4 min-[900px]:gap-8">
+      <!-- Col 1: Бренд и одна строка описания -->
+      <div class="space-y-1.5 min-[900px]:space-y-2">
+        <a href="/" class="inline-flex items-center gap-2 group focus:outline-none focus:ring-2 focus:ring-[var(--footer-link)] rounded">
+          <div class="w-6 h-6 rounded-md bg-[var(--accent)]/15 border border-[var(--border)] flex items-center justify-center text-[var(--footer-link)]">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+              <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+          </div>
+          <span class="font-bold text-sm min-[900px]:text-base text-[var(--footer-heading)] tracking-wide">{SITE_NAME}</span>
+        </a>
+        <p class="text-xs text-[var(--footer-text)] leading-snug">
+          Инженерные строительные расчёты по СП и ГОСТ для точного частного домостроения.
+        </p>
+      </div>
+
+      <!-- Col 2: «Калькуляторы по этапам» -->
+      <div>
+        <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--footer-heading)] mb-2 min-[900px]:mb-2.5">
+          Калькуляторы по этапам
+        </h3>
+        <ul class="grid grid-cols-2 min-[900px]:grid-cols-1 gap-x-4 gap-y-1 text-xs min-[900px]:text-sm">
+          <li>
+            <a href="/kalkulyatory/#fundament" class="text-[var(--footer-link)] hover:underline transition-colors py-1 inline-block">
+              Фундамент
+            </a>
+          </li>
+          <li>
+            <a href="/kalkulyatory/#steny" class="text-[var(--footer-link)] hover:underline transition-colors py-1 inline-block">
+              Стены
+            </a>
+          </li>
+          <li>
+            <a href="/kalkulyatory/#krovlya" class="text-[var(--footer-link)] hover:underline transition-colors py-1 inline-block">
+              Кровля
+            </a>
+          </li>
+          <li>
+            <a href="/kalkulyatory/#otdelka" class="text-[var(--footer-link)] hover:underline transition-colors py-1 inline-block">
+              Отделка
+            </a>
+          </li>
+          <li>
+            <a href="/kalkulyatory/#inzheneriya" class="text-[var(--footer-link)] hover:underline transition-colors py-1 inline-block">
+              Инженерия
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Col 3: «Методика» -->
+      <div>
+        <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--footer-heading)] mb-2 min-[900px]:mb-2.5">
+          Методика
+        </h3>
+        <ul class="grid grid-cols-2 min-[900px]:grid-cols-1 gap-x-4 gap-y-1 text-xs min-[900px]:text-sm">
+          <li>
+            <a href="/normy/" class="text-[var(--footer-link)] hover:underline transition-colors py-1 inline-block">
+              Нормативы СП/ГОСТ
+            </a>
+          </li>
+          <li>
+            <a href="/o-proekte/" class="text-[var(--footer-link)] hover:underline transition-colors py-1 inline-block">
+              Как мы считаем
+            </a>
+          </li>
+          <li>
+            <a href="/o-proekte/" class="text-[var(--footer-link)] hover:underline transition-colors py-1 inline-block">
+              О проекте
+            </a>
+          </li>
+          <li>
+            <a href="/kalkulyatory/" class="text-[var(--footer-link)] hover:underline transition-colors py-1 inline-block">
+              Каталог калькуляторов
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Col 4: «Контакты и правовое» -->
+      <div class="space-y-1.5 min-[900px]:space-y-2">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--footer-heading)] mb-2 min-[900px]:mb-2.5">
+          Контакты и правовое
+        </h3>
+        <ul class="grid grid-cols-2 min-[900px]:grid-cols-1 gap-x-4 gap-y-1 text-xs min-[900px]:text-sm">
+          <li>
+            <a href="/kontakty/" class="text-[var(--footer-link)] hover:underline transition-colors py-1 inline-block">
+              Контакты
+            </a>
+          </li>
+          <li>
+            <a href="/politika-konfidencialnosti/" class="text-[var(--footer-link)] hover:underline transition-colors py-1 inline-block">
+              Политика конфиденциальности
+            </a>
+          </li>
+          <li class="col-span-2 min-[900px]:col-span-1">
+            <a href="/otkaz-ot-otvetstvennosti/" class="text-[var(--footer-link)] hover:underline transition-colors py-1 inline-block">
+              Отказ от ответственности
+            </a>
+          </li>
+        </ul>
+        <p class="text-[11px] min-[900px]:text-xs text-[var(--footer-text)] leading-tight pt-1">
+          Расчёты справочные и не заменяют проектную документацию.
+        </p>
+        <div class="pt-0.5">
+          <button
+            id="reset-storage-btn"
+            type="button"
+            class="text-[11px] text-[var(--footer-text)] hover:text-[var(--footer-link)] underline underline-offset-2 transition-colors cursor-pointer focus:outline-none"
+            title="Очистить сохраненные настройки темы и введенные данные калькуляторов"
+          >
+            Сбросить сохранённые данные
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Bottom Row -->
+    <div class="mt-5 min-[900px]:mt-8 pt-3 min-[900px]:pt-4 border-t border-[var(--border)] flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] min-[900px]:text-xs text-[var(--footer-text)]">
+      <div class="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
+        <span>© {currentYear} {SITE_NAME}</span>
+        <span aria-hidden="true" class="opacity-50">·</span>
+        <span>Обновлено: {buildDate}</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="/sitemap-index.xml" class="text-[var(--footer-link)] hover:underline transition-colors">
+          Карта сайта (Sitemap)
+        </a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const resetBtn = document.getElementById('reset-storage-btn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (confirm('Очистить сохранённый цвет 3D-дома и сохранённые значения калькуляторов в вашем браузере?')) {
+        localStorage.removeItem('houseColor');
+        localStorage.removeItem('cookieAccepted');
+        localStorage.removeItem('stroycalc_theme');
+        // Clear all calculator drafts
+        Object.keys(localStorage).forEach((key) => {
+          if (key.startsWith('calc_')) {
+            localStorage.removeItem(key);
+          }
+        });
+        alert('Локальные данные успешно очищены.');
+        window.location.reload();
+      }
+    });
+  }
+</script>

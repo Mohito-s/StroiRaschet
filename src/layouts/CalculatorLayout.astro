@@ -1,0 +1,182 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import Breadcrumbs from '../components/common/Breadcrumbs.astro';
+import PartnerBanner from '../components/partner/PartnerBanner.astro';
+import type { BreadcrumbItem, FaqItem } from '../components/seo/JsonLd.astro';
+import type { NormativeItem } from '../data/norms';
+
+export interface RelatedCalculator {
+  href: string;
+  title: string;
+  norm: string;
+}
+
+export interface Props {
+  calculatorId: string;
+  h1: string;
+  title: string;
+  description: string;
+  lead: string;
+  tldr: string;
+  updatedAt: string;
+  norms: NormativeItem[];
+  faq: FaqItem[];
+  relatedCalculators: RelatedCalculator[];
+}
+
+const {
+  calculatorId,
+  h1,
+  title,
+  description,
+  lead,
+  tldr,
+  updatedAt,
+  norms,
+  faq,
+  relatedCalculators
+} = Astro.props;
+
+const breadcrumbs: BreadcrumbItem[] = [
+  { name: 'Калькуляторы', item: '/kalkulyatory/' },
+  { name: h1, item: `/kalkulyatory/${calculatorId}/` }
+];
+
+const webAppInfo = {
+  name: h1,
+  description,
+  applicationCategory: 'UtilitiesApplication'
+};
+---
+
+<BaseLayout
+  title={title}
+  description={description}
+  breadcrumbs={breadcrumbs}
+  faq={faq}
+  webApp={webAppInfo}
+  modifiedTime={updatedAt}
+>
+  <div class="max-w-6xl mx-auto px-3.5 sm:px-6 lg:px-8 py-6 sm:py-8 flex-grow space-y-8 sm:space-y-10 min-w-0 w-full max-w-full">
+    <!-- 1. Breadcrumbs -->
+    <Breadcrumbs items={breadcrumbs} />
+
+    <!-- 2. Header and TL;DR block (for AI crawlers and quick reading) -->
+    <header class="space-y-4 min-w-0">
+      <div class="flex flex-wrap items-center gap-2 max-w-full">
+        {norms.map((norm) => (
+          <span class="text-[11px] font-mono font-semibold px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-500 dark:text-amber-300 border border-amber-500/20 max-w-full">
+            {norm.code}
+          </span>
+        ))}
+        <span class="text-[11px] text-[var(--text-muted)]">
+          Обновлено: {updatedAt}
+        </span>
+      </div>
+
+      <h1 class="text-2xl sm:text-4xl lg:text-5xl font-black text-[var(--text)] tracking-tight leading-tight break-words-anywhere">
+        {h1}
+      </h1>
+
+      <p class="text-sm sm:text-base lg:text-lg text-[var(--text-muted)] leading-relaxed max-w-3xl break-words-anywhere">
+        {lead}
+      </p>
+
+      <!-- TL;DR (AI and quick snippet answer) -->
+      <div class="p-4 rounded-2xl bg-[var(--surface-hover)] border border-[var(--border)] flex flex-col sm:flex-row items-start gap-2.5 sm:gap-3 max-w-full">
+        <span class="text-[var(--accent)] font-bold text-xs sm:text-sm uppercase tracking-wider flex-shrink-0 mt-0.5">Кратко:</span>
+        <p class="text-xs sm:text-sm text-[var(--text)] leading-relaxed font-medium break-words-anywhere min-w-0">
+          {tldr}
+        </p>
+      </div>
+    </header>
+
+    <!-- 3. Interactive Calculator Island -->
+    <section aria-label="Форма инженерного расчёта" class="relative z-20 min-w-0 max-w-full">
+      <slot name="calculator" />
+    </section>
+
+    <!-- 4. Expert Text (>= 900 words, pure HTML, formulas, real-world examples) -->
+    <article class="glass-card rounded-3xl p-5 sm:p-10 border border-[var(--border)] space-y-8 text-[var(--text)] leading-relaxed text-sm sm:text-base break-words-anywhere max-w-full overflow-hidden">
+      <slot name="expert-content" />
+    </article>
+
+    <!-- 5. Normative Basis details -->
+    <section class="glass-card rounded-2xl p-5 sm:p-6 border border-[var(--border)] space-y-4 min-w-0 max-w-full">
+      <h3 class="text-xs font-bold text-[var(--text)] uppercase tracking-wider">
+        Нормативная база расчёта
+      </h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+        {norms.map((norm) => (
+          <div class="p-4 rounded-xl bg-[var(--surface-hover)] border border-[var(--border)] space-y-1.5 min-w-0 break-words-anywhere">
+            <div class="flex flex-wrap items-center justify-between gap-1.5">
+              <span class="font-mono text-xs font-bold text-amber-500 dark:text-amber-300">{norm.code}</span>
+              {norm.verified ? (
+                <span class="text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">Верифицирован</span>
+              ) : (
+                <span class="text-[10px] text-amber-600 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">Справочный ориентир</span>
+              )}
+            </div>
+            <h4 class="text-xs font-semibold text-[var(--text)]">{norm.title}</h4>
+            {norm.note && <p class="text-xs text-[var(--text-muted)] leading-relaxed">{norm.note}</p>}
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- 6. FAQ Section -->
+    <section class="space-y-4 min-w-0 max-w-full">
+      <h3 class="text-xl sm:text-2xl font-extrabold text-[var(--text)] tracking-tight break-words-anywhere">
+        Часто задаваемые вопросы по расчёту
+      </h3>
+      <div class="space-y-3 min-w-0">
+        {faq.map((item) => (
+          <details class="glass-card rounded-2xl p-4 sm:p-5 border border-[var(--border)] group min-w-0 break-words-anywhere">
+            <summary class="font-medium text-sm sm:text-base text-[var(--text)] cursor-pointer list-none flex items-center justify-between gap-3">
+              <span class="min-w-0 flex-1">{item.question}</span>
+              <span class="w-6 h-6 rounded-full bg-[var(--surface-hover)] flex items-center justify-center text-[var(--accent)] group-open:rotate-180 transition-transform flex-shrink-0">
+                ↓
+              </span>
+            </summary>
+            <p class="mt-3 text-xs sm:text-sm text-[var(--text-muted)] leading-relaxed border-t border-[var(--border)] pt-3 break-words-anywhere">
+              {item.answer}
+            </p>
+          </details>
+        ))}
+      </div>
+    </section>
+
+    <!-- 7. Partner Banner -->
+    <PartnerBanner />
+
+    <!-- 8. Related Calculators (Internal Linking) -->
+    <section class="space-y-4">
+      <h3 class="text-base font-bold text-[var(--text)] uppercase tracking-wider text-xs">
+        Что считать дальше (связанные этапы стройки)
+      </h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+        {relatedCalculators.map((calc) => (
+          <a
+            href={calc.href}
+            class="glass-card glass-card-hover p-4 rounded-xl block border border-[var(--border)] group"
+          >
+            <span class="text-[10px] font-mono text-[var(--accent)] block mb-1">{calc.norm}</span>
+            <span class="text-xs sm:text-sm font-medium text-[var(--text)] group-hover:text-[var(--accent)] transition-colors block">
+              {calc.title}
+            </span>
+          </a>
+        ))}
+      </div>
+    </section>
+
+    <!-- 9. Engineering Disclaimer -->
+    <div class="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-[var(--text-muted)] space-y-1.5">
+      <p class="font-semibold text-amber-600 dark:text-amber-300">
+        Инженерный дисклеймер
+      </p>
+      <p>
+        Расчёт является предварительным и справочным, предназначен для оценки объёмов закупки материалов и не заменяет проектную документацию. Для несущих конструкций и сложных геологических условий обратитесь к инженеру-проектировщику.
+      </p>
+    </div>
+  </div>
+</BaseLayout>

@@ -1,0 +1,284 @@
+---
+import { LOCKED_THEME, THEME_PRESETS } from '../../config/theme';
+
+const presets = Object.values(THEME_PRESETS);
+const isLocked = Boolean(LOCKED_THEME);
+---
+
+{
+  !isLocked && (
+    <aside
+      id="theme-switcher-widget"
+      class="fixed bottom-5 right-5 z-50 select-none no-print hidden md:block"
+      aria-label="Переключатель цветовой темы"
+    >
+      <!-- Collapsed floating pill button -->
+      <button
+        id="theme-toggle-btn"
+        type="button"
+        class="glass-card px-3.5 py-2.5 rounded-full flex items-center gap-2.5 shadow-2xl hover:scale-105 transition-all text-xs font-semibold cursor-pointer border border-[var(--border)] bg-[var(--surface)] text-[var(--text)]"
+        aria-expanded="false"
+        aria-controls="theme-panel"
+        title="Выбрать тему оформления"
+      >
+        <span class="w-3 h-3 rounded-full bg-[var(--accent)] animate-pulse" aria-hidden="true" />
+        <span id="current-theme-label">Тема: Неон</span>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="w-4 h-4 text-[var(--text-muted)] transition-transform duration-200"
+          id="theme-chevron"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="m18 15-6-6-6 6" />
+        </svg>
+      </button>
+
+      <!-- Expandable presets modal / panel -->
+      <div
+        id="theme-panel"
+        class="hidden absolute bottom-14 right-0 w-80 glass-card p-4 rounded-2xl shadow-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] backdrop-blur-2xl transition-all"
+        role="dialog"
+        aria-label="Палитра тем оформления"
+      >
+        <div class="flex items-center justify-between pb-3 border-b border-[var(--border)]">
+          <div>
+            <div class="text-sm font-bold tracking-tight">Тема оформления</div>
+            <div class="text-[11px] text-[var(--text-muted)]">Для сайта и 3D-дома</div>
+          </div>
+          <button
+            id="theme-close-btn"
+            type="button"
+            class="text-[var(--text-muted)] hover:text-[var(--text)] p-1 rounded-md transition-colors"
+            aria-label="Закрыть панель тем"
+          >
+            ✕
+          </button>
+        </div>
+
+        <!-- Theme presets list -->
+        <div class="space-y-2 py-3" role="radiogroup" aria-label="Варианты тем">
+          {presets.map((preset) => (
+            <button
+              type="button"
+              data-theme-id={preset.id}
+              class="theme-preset-btn w-full text-left p-2.5 rounded-xl border border-transparent hover:border-[var(--border)] transition-all flex items-center justify-between group cursor-pointer"
+              role="radio"
+              aria-checked="false"
+            >
+              <div class="flex items-center gap-3">
+                <!-- 3-dot miniature palette preview -->
+                <div class="flex items-center -space-x-1 p-1 rounded-md bg-black/20 border border-white/5">
+                  <span
+                    class="w-3.5 h-3.5 rounded-full border border-black/30 shadow-sm"
+                    style={`background-color: ${preset.palette[0]}`}
+                    title="Акцент"
+                  />
+                  <span
+                    class="w-3.5 h-3.5 rounded-full border border-black/30 shadow-sm"
+                    style={`background-color: ${preset.palette[1]}`}
+                    title="Фон"
+                  />
+                  <span
+                    class="w-3.5 h-3.5 rounded-full border border-black/30 shadow-sm"
+                    style={`background-color: ${preset.palette[2]}`}
+                    title="Поверхность"
+                  />
+                </div>
+                <div>
+                  <div class="text-xs font-bold leading-tight group-hover:text-[var(--accent)] transition-colors">
+                    {preset.name}
+                  </div>
+                  <div class="text-[10px] text-[var(--text-muted)] line-clamp-1">
+                    {preset.description}
+                  </div>
+                </div>
+              </div>
+              <span class="theme-check-icon hidden text-sm font-bold text-[var(--accent)]">
+                ✓
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <!-- "Ссылка брату" action button -->
+        <div class="pt-2 border-t border-[var(--border)] flex flex-col gap-2">
+          <button
+            id="share-brother-btn"
+            type="button"
+            class="btn-primary w-full text-xs py-2.5 flex items-center justify-center gap-2 font-semibold cursor-pointer"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+            </svg>
+            <span>Ссылка брату (с этой темой)</span>
+          </button>
+          <div
+            id="copy-toast"
+            class="hidden text-[11px] text-center text-emerald-400 font-medium py-1 animate-fade-in"
+          >
+            ✓ Ссылка скопирована! Брату откроется этот вариант.
+          </div>
+        </div>
+      </div>
+    </aside>
+  )
+}
+
+<script>
+  import { LOCKED_THEME, THEME_PRESETS, DEFAULT_THEME } from '../../config/theme';
+
+  function initThemeSystem() {
+    const isLocked = Boolean(LOCKED_THEME);
+
+    // 1. Determine active theme
+    const urlParams = new URLSearchParams(window.location.search);
+    const themeFromUrl = urlParams.get('theme');
+    const storedTheme = localStorage.getItem('stroycalc_theme');
+
+    let activeTheme = DEFAULT_THEME;
+    if (isLocked && LOCKED_THEME) {
+      activeTheme = LOCKED_THEME;
+    } else if (themeFromUrl && THEME_PRESETS[themeFromUrl]) {
+      activeTheme = themeFromUrl;
+      localStorage.setItem('stroycalc_theme', activeTheme);
+    } else if (storedTheme && THEME_PRESETS[storedTheme]) {
+      activeTheme = storedTheme;
+    }
+
+    applyTheme(activeTheme);
+
+    if (isLocked) return;
+
+    // 2. Setup interactive switcher UI
+    const toggleBtn = document.getElementById('theme-toggle-btn');
+    const panel = document.getElementById('theme-panel');
+    const closeBtn = document.getElementById('theme-close-btn');
+    const label = document.getElementById('current-theme-label');
+    const chevron = document.getElementById('theme-chevron');
+    const shareBtn = document.getElementById('share-brother-btn');
+    const toast = document.getElementById('copy-toast');
+    const presetButtons = document.querySelectorAll<HTMLButtonElement>('.theme-preset-btn');
+
+    function updateUiState(themeId: string) {
+      const preset = THEME_PRESETS[themeId];
+      if (label && preset) {
+        label.textContent = `Тема: ${preset.name.split(' ')[0]}`;
+      }
+
+      presetButtons.forEach((btn) => {
+        const id = btn.getAttribute('data-theme-id');
+        const isCurrent = id === themeId;
+        btn.setAttribute('aria-checked', isCurrent ? 'true' : 'false');
+        btn.classList.toggle('border-[var(--accent)]', isCurrent);
+        btn.classList.toggle('bg-[var(--surface-hover)]', isCurrent);
+        const check = btn.querySelector('.theme-check-icon');
+        if (check) check.classList.toggle('hidden', !isCurrent);
+      });
+    }
+
+    updateUiState(activeTheme);
+
+    function togglePanel(open?: boolean) {
+      if (!panel) return;
+      const willOpen = open !== undefined ? open : panel.classList.contains('hidden');
+      if (willOpen) {
+        panel.classList.remove('hidden');
+        if (chevron) chevron.style.transform = 'rotate(180deg)';
+        if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
+      } else {
+        panel.classList.add('hidden');
+        if (chevron) chevron.style.transform = 'rotate(0deg)';
+        if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    toggleBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePanel();
+    });
+
+    closeBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePanel(false);
+    });
+
+    // Close panel on outside click
+    document.addEventListener('click', (e) => {
+      if (panel && !panel.contains(e.target as Node) && toggleBtn && !toggleBtn.contains(e.target as Node)) {
+        togglePanel(false);
+      }
+    });
+
+    // Handle preset selection
+    presetButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const themeId = btn.getAttribute('data-theme-id');
+        if (themeId && THEME_PRESETS[themeId]) {
+          applyTheme(themeId);
+          localStorage.setItem('stroycalc_theme', themeId);
+
+          // Update URL without reload
+          const url = new URL(window.location.href);
+          url.searchParams.set('theme', themeId);
+          window.history.replaceState({}, '', url.toString());
+
+          updateUiState(themeId);
+        }
+      });
+    });
+
+    // "Ссылка брату" copy button
+    shareBtn?.addEventListener('click', async () => {
+      const currentTheme = document.documentElement.getAttribute('data-theme') || DEFAULT_THEME;
+      const shareUrl = new URL(window.location.href);
+      shareUrl.searchParams.set('theme', currentTheme);
+
+      try {
+        await navigator.clipboard.writeText(shareUrl.toString());
+        if (toast) {
+          toast.classList.remove('hidden');
+          setTimeout(() => {
+            toast.classList.add('hidden');
+          }, 4000);
+        }
+      } catch {
+        // Fallback for older browsers
+        const tempInput = document.createElement('input');
+        tempInput.value = shareUrl.toString();
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+        if (toast) {
+          toast.classList.remove('hidden');
+          setTimeout(() => {
+            toast.classList.add('hidden');
+          }, 4000);
+        }
+      }
+    });
+  }
+
+  function applyTheme(themeId: string) {
+    document.documentElement.setAttribute('data-theme', themeId);
+    window.dispatchEvent(new CustomEvent('theme-change', { detail: { theme: themeId } }));
+  }
+
+  // Run on page load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initThemeSystem);
+  } else {
+    initThemeSystem();
+  }
+</script>

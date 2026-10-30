@@ -1,0 +1,125 @@
+---
+// Recent Calculations ("Мой дом") block on homepage under hero
+---
+
+<section id="my-house-section" class="hidden relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 transition-all">
+  <div id="my-house-container" class="hidden">
+    <div class="flex items-center justify-between mb-6">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-[var(--surface)] border border-[var(--border)] flex items-center justify-center text-[var(--accent)] shadow-sm">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+        </div>
+        <div>
+          <h2 class="text-xl sm:text-2xl font-black text-[var(--text)] tracking-tight flex items-center gap-2">
+            <span>Мой дом: сохранённые сметы</span>
+            <span id="my-house-count" class="text-xs px-2 py-0.5 rounded-full bg-[var(--accent)] text-[var(--btn-text)] font-bold">0</span>
+          </h2>
+          <p class="text-xs text-[var(--text-muted)]">
+            Ваши сохранённые расчёты в браузере. Вы можете вернуться к ним или скорректировать параметры в один клик.
+          </p>
+        </div>
+      </div>
+
+      <button
+        id="clear-my-house-btn"
+        type="button"
+        class="text-xs text-[var(--text-muted)] hover:text-rose-400 transition-colors cursor-pointer px-3 py-1.5 rounded-lg border border-transparent hover:border-rose-400/20"
+      >
+        Очистить историю
+      </button>
+    </div>
+
+    <!-- Cards Grid -->
+    <div id="my-house-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <!-- Injected dynamically via client script -->
+    </div>
+  </div>
+</section>
+
+<script>
+  import { getSavedCalculations, deleteCalculation, clearAllCalculations } from '../../lib/storage/myHouse';
+
+  function renderRecentCalculations() {
+    const section = document.getElementById('my-house-section');
+    const container = document.getElementById('my-house-container');
+    const cardsContainer = document.getElementById('my-house-cards');
+    const countBadge = document.getElementById('my-house-count');
+    const clearBtn = document.getElementById('clear-my-house-btn');
+
+    if (!container || !cardsContainer || !countBadge) return;
+
+    const list = getSavedCalculations();
+
+    if (list.length === 0) {
+      if (section) section.classList.add('hidden');
+      container.classList.add('hidden');
+      return;
+    }
+
+    if (section) section.classList.remove('hidden');
+    container.classList.remove('hidden');
+    countBadge.textContent = String(list.length);
+    cardsContainer.innerHTML = '';
+
+    list.slice(0, 6).forEach((calc) => {
+      const card = document.createElement('div');
+      card.className = 'glass-card glass-card-hover p-5 rounded-2xl flex flex-col justify-between border border-[var(--border)] group relative';
+
+      card.innerHTML = `
+        <div>
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[var(--bg)] text-[var(--accent)] border border-[var(--border)]">
+              ${calc.calcName || 'Расчёт'}
+            </span>
+            <span class="text-[10px] text-[var(--text-muted)]">
+              ${calc.date}
+            </span>
+          </div>
+
+          <h3 class="text-base font-bold text-[var(--text)] group-hover:text-[var(--accent)] transition-colors mb-2">
+            ${calc.title}
+          </h3>
+
+          <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
+            ${calc.summary}
+          </p>
+        </div>
+
+        <div class="pt-3 border-t border-[var(--border)] flex items-center justify-between text-xs">
+          <a href="${calc.url}" class="font-semibold text-[var(--accent)] hover:underline inline-flex items-center gap-1">
+            <span>Перейти к смете</span>
+            <span>→</span>
+          </a>
+          <button type="button" data-delete-id="${calc.id}" class="text-[var(--text-muted)] hover:text-rose-400 p-1 transition-colors" title="Удалить запись">
+            ✕
+          </button>
+        </div>
+      `;
+
+      const deleteBtn = card.querySelector(`[data-delete-id="${calc.id}"]`);
+      deleteBtn?.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        deleteCalculation(calc.id);
+        renderRecentCalculations();
+      });
+
+      cardsContainer.appendChild(card);
+    });
+
+    clearBtn?.addEventListener('click', () => {
+      if (confirm('Очистить сохранённые сметы из браузера?')) {
+        clearAllCalculations();
+        renderRecentCalculations();
+      }
+    }, { once: true });
+  }
+
+  // Listen for storage changes
+  window.addEventListener('my-house-updated', renderRecentCalculations);
+  document.addEventListener('DOMContentLoaded', renderRecentCalculations);
+  renderRecentCalculations();
+</script>

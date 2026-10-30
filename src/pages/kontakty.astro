@@ -1,0 +1,93 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from '../components/common/Breadcrumbs.astro';
+import { SITE_NAME, CONTACT_EMAIL, TELEGRAM_URL, OPERATOR_NAME } from '../config/site';
+
+const breadcrumbs = [
+  { name: 'Контакты', item: '/kontakty/' }
+];
+---
+
+<BaseLayout
+  title="Контакты и обратная связь"
+  description="Контакты администрации проекта: электронная почта для связи, предложений по новым калькуляторам и сообщений об ошибках в формулах."
+  breadcrumbs={breadcrumbs}
+>
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-grow">
+    <Breadcrumbs items={breadcrumbs} />
+
+    <header class="mt-4 mb-8">
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-3">
+        Контакты проекта {SITE_NAME}
+      </h1>
+      <p class="text-base text-slate-300 leading-relaxed">
+        Свяжитесь с нами напрямую по вопросам сотрудничества, замечаниям по расчетам или с предложениями новых строительных калькуляторов.
+      </p>
+    </header>
+
+    <div class="space-y-6">
+      <!-- Direct contact cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <!-- Email -->
+        <a
+          href={`mailto:${CONTACT_EMAIL}`}
+          class="glass-card glass-card-hover p-6 rounded-2xl border border-white/5 flex items-start gap-4 group"
+        >
+          <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect width="20" height="16" x="2" y="4" rx="2"/>
+              <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+            </svg>
+          </div>
+          <div class="space-y-1">
+            <span class="text-xs uppercase font-bold tracking-wider text-slate-400">Электронная почта</span>
+            <div class="text-base font-semibold text-white group-hover:text-amber-300 transition-colors">
+              {CONTACT_EMAIL}
+            </div>
+            <p class="text-xs text-slate-400">
+              По вопросам работы формул и предложениям
+            </p>
+          </div>
+        </a>
+
+        <!-- Telegram -->
+        <a
+          href={TELEGRAM_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="glass-card glass-card-hover p-6 rounded-2xl border border-white/5 flex items-start gap-4 group"
+        >
+          <div class="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m22 2-7 20-4-9-9-4Z"/>
+              <path d="M22 2 11 13"/>
+            </svg>
+          </div>
+          <div class="space-y-1">
+            <span class="text-xs uppercase font-bold tracking-wider text-slate-400">Telegram</span>
+            <div class="text-base font-semibold text-white group-hover:text-cyan-300 transition-colors">
+              Канал / Связь
+            </div>
+            <p class="text-xs text-slate-400">
+              Быстрые сообщения и новости обновлений
+            </p>
+          </div>
+        </a>
+      </div>
+
+      <!-- No form disclaimer -->
+      <div class="p-6 rounded-2xl glass-card border border-white/5 text-xs text-slate-400 leading-relaxed space-y-2">
+        <h3 class="text-sm font-semibold text-slate-200">
+          Принцип отсутствия контактных форм
+        </h3>
+        <p>
+          Для максимальной безопасности пользователей мы осознанно не размещаем на сайте веб-формы ввода личных данных (имени, телефона или адреса). 
+          Все обращения принимаются исключительно напрямую через ваш почтовый клиент или Telegram.
+        </p>
+        <p class="text-slate-500">
+          Администратор: {OPERATOR_NAME}
+        </p>
+      </div>
+    </div>
+  </div>
+</BaseLayout>

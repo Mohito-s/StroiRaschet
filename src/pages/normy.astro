@@ -1,0 +1,82 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from '../components/common/Breadcrumbs.astro';
+import { NORMATIVE_REGISTRY } from '../data/norms';
+
+const breadcrumbs = [
+  { name: 'Нормативы СП и ГОСТ', item: '/normy/' }
+];
+
+const normEntries = Object.values(NORMATIVE_REGISTRY);
+---
+
+<BaseLayout
+  title="Справочник нормативной базы: СП, СНиП и ГОСТ"
+  description="Реестр актуальных строительных норм, правил и стандартов, используемых в алгоритмах расчёта: СП 63, СП 20, СП 50, СП 22, ГОСТ 7473 и др."
+  breadcrumbs={breadcrumbs}
+>
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-grow">
+    <Breadcrumbs items={breadcrumbs} />
+
+    <header class="mt-4 mb-8">
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-3">
+        Справочник строительных норм (СП и ГОСТ)
+      </h1>
+      <p class="text-base text-slate-300 max-w-3xl leading-relaxed">
+        Вся расчетная математика портала базируется на открытых государственных стандартах и актуализированных сводах правил. Мы принципиально не придумываем нормативные коэффициенты и открыто публикуем их статус.
+      </p>
+    </header>
+
+    <div class="space-y-6">
+      {normEntries.map((entry) => (
+        <section class="glass-card rounded-2xl p-6 border border-white/5 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-white/5">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+              {entry.title}
+            </h2>
+            <a
+              href={`/kalkulyatory/${entry.calculatorId}/`}
+              class="text-xs text-amber-400 hover:underline inline-flex items-center gap-1 font-medium"
+            >
+              <span>Перейти к калькулятору</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 12h14"/>
+                <path d="m12 5 7 7-7 7"/>
+              </svg>
+            </a>
+          </div>
+
+          <div class="grid grid-cols-1 gap-3">
+            {entry.normativeBasis.map((norm) => (
+              <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-1">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="font-mono text-xs font-semibold text-amber-300">
+                    {norm.code}
+                  </span>
+                  {norm.verified ? (
+                    <span class="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                      <span>Верифицирован</span>
+                    </span>
+                  ) : (
+                    <span class="inline-flex items-center gap-1 text-[11px] font-medium text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20" title="Требует подтверждения производителем или проектом">
+                      <span>Справочный ориентир</span>
+                    </span>
+                  )}
+                </div>
+                <h3 class="text-sm font-medium text-slate-100">
+                  {norm.title}
+                </h3>
+                {norm.note && (
+                  <p class="text-xs text-slate-400 leading-relaxed">
+                    {norm.note}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  </div>
+</BaseLayout>

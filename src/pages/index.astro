@@ -1,0 +1,560 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PartnerBanner from '../components/partner/PartnerBanner.astro';
+import RecentCalculations from '../components/home/RecentCalculations.astro';
+import { SITE_NAME, SITE_DESCRIPTION } from '../config/site';
+
+const popularCalculators = [
+  {
+    id: 'kalkulyator-betona',
+    title: 'Калькулятор бетона для фундамента',
+    desc: 'Точный объём бетонной смеси (лента, плита, столбы), кубатура и вес.',
+    norm: 'ГОСТ 7473-2010',
+    category: 'Фундамент',
+    icon: 'cube'
+  },
+  {
+    id: 'kalkulyator-kirpicha',
+    title: 'Калькулятор кирпича',
+    desc: 'Количество одинарного, полуторного или двойного кирпича с вычетом проемов.',
+    norm: 'ГОСТ 530-2012',
+    category: 'Стены',
+    icon: 'layers'
+  },
+  {
+    id: 'kalkulyator-gazobetona',
+    title: 'Калькулятор газобетона',
+    desc: 'Расчет стеновых блоков D400–D600, клеевого состава и кубатуры стен.',
+    norm: 'ГОСТ 31360-2007',
+    category: 'Стены',
+    icon: 'box'
+  },
+  {
+    id: 'kalkulyator-pilomaterialov',
+    title: 'Калькулятор пиломатериалов',
+    desc: 'Кубатура обрезной доски и бруса, перевод штук в кубы и обратно.',
+    norm: 'ГОСТ 8486-86',
+    category: 'Конструкции',
+    icon: 'columns'
+  },
+  {
+    id: 'kalkulyator-krovli',
+    title: 'Калькулятор площади кровли',
+    desc: 'Геометрическая площадь двускатной и вальмовой крыши с учетом свесов.',
+    norm: 'СП 17.13330.2017',
+    category: 'Кровля',
+    icon: 'triangle'
+  },
+  {
+    id: 'kalkulyator-utepleniya',
+    title: 'Калькулятор утепления стен',
+    desc: 'Теплотехнический расчет толщины теплоизоляции по градусо-суткам ГСОП.',
+    norm: 'СП 50.13330.2012',
+    category: 'Утепление',
+    icon: 'thermometer'
+  }
+];
+
+const constructionStages = [
+  {
+    stage: '1. Нулевой цикл и фундамент',
+    calcs: [
+      { id: 'kalkulyator-betona', title: 'Бетон для фундамента', norm: 'ГОСТ 7473-2010' },
+      { id: 'kalkulyator-armatury', title: 'Арматура фундамента', norm: 'СП 63.13330.2018' },
+      { id: 'kalkulyator-glubiny-promerzaniya', title: 'Глубина промерзания', norm: 'СП 22.13330.2016' },
+      { id: 'kalkulyator-septika', title: 'Объем септика', norm: 'СП 32.13330.2018' }
+    ]
+  },
+  {
+    stage: '2. Возведение стен и перекрытий',
+    calcs: [
+      { id: 'kalkulyator-kirpicha', title: 'Кирпичная кладка', norm: 'ГОСТ 530-2012' },
+      { id: 'kalkulyator-gazobetona', title: 'Газобетонные блоки', norm: 'ГОСТ 31360-2007' },
+      { id: 'kalkulyator-pilomaterialov', title: 'Брус и доска (кубатура)', norm: 'ГОСТ 8486-86' }
+    ]
+  },
+  {
+    stage: '3. Кровля и стропильная система',
+    calcs: [
+      { id: 'kalkulyator-krovli', title: 'Площадь кровли', norm: 'СП 17.13330.2017' },
+      { id: 'kalkulyator-snegovoy-nagruzki', title: 'Снеговые нагрузки', norm: 'СП 20.13330.2016' }
+    ]
+  },
+  {
+    stage: '4. Утепление и отделка',
+    calcs: [
+      { id: 'kalkulyator-utepleniya', title: 'Теплоизоляция стен', norm: 'СП 50.13330.2012' },
+      { id: 'kalkulyator-styazhki', title: 'Стяжка пола', norm: 'СП 29.13330.2011' },
+      { id: 'kalkulyator-shtukaturki', title: 'Штукатурка стен', norm: 'СП 71.13330.2017' },
+      { id: 'kalkulyator-plitki', title: 'Плитка и затирка', norm: 'СП 71.13330.2017' },
+      { id: 'kalkulyator-lestnicy', title: 'Межэтажная лестница', norm: 'СП 55.13330.2016' }
+    ]
+  },
+  {
+    stage: '5. Инженерные коммуникации',
+    calcs: [
+      { id: 'kalkulyator-ventilyacii', title: 'Вентиляция и воздухообмен', norm: 'СП 60.13330.2020' },
+      { id: 'kalkulyator-secheniya-kabelya', title: 'Сечение кабеля', norm: 'ПУЭ / ГОСТ 31996' }
+    ]
+  }
+];
+
+const faqItems = [
+  {
+    question: 'Почему расчетам на сайте можно доверять?',
+    answer: 'Каждый калькулятор разработан строго на основе формул актуализированных сводов правил (СП) и стандартов ГОСТ. Мы не скрываем математику: формулы и нормативная база подробно расписаны на страницах.'
+  },
+  {
+    question: 'Нужна ли регистрация или оплата?',
+    answer: 'Нет, портал полностью бесплатный. Никаких платных функций, регистрации, личных кабинетов или сбора номеров телефонов на сайте нет и никогда не будет.'
+  },
+  {
+    question: 'Как учитывается запас строительных материалов?',
+    answer: 'В зависимости от типа материала закладывается нормативный или технологический запас: для бетона — 3–5%, для кирпича — 5%, для плитки по диагонали — 10–15%. Коэффициент запаса можно отрегулировать.'
+  },
+  {
+    question: 'Сохраняются ли мои введенные данные?',
+    answer: 'Введенные значения и настройки хранятся только в локальной памяти вашего браузера (localStorage) и не передаются на сервер. Вы можете очистить их в один клик в футере.'
+  },
+  {
+    question: 'Заменяет ли онлайн-расчет проектную документацию?',
+    answer: 'Все онлайн-расчёты носят предварительный инженерно-ознакомительный характер. Для строительства несущих и ответственных конструкций требуется официальный проект с расчетом конструктора.'
+  }
+];
+---
+
+<BaseLayout
+  title={`${SITE_NAME} — строительные калькуляторы по СП и ГОСТ`}
+  description={SITE_DESCRIPTION}
+  faq={faqItems}
+>
+  <!-- 1. Soft ambient radial glow behind house model (z-index: 0, behind canvas, 40% quieter) -->
+  <div
+    class="fixed inset-0 pointer-events-none z-0 hidden min-[900px]:block"
+    style="background: radial-gradient(circle 60vh at 66% 46%, rgba(15, 58, 71, 0.6) 0%, rgba(15, 58, 71, 0.3) 45%, transparent 100%);"
+    aria-hidden="true"
+  ></div>
+  <div
+    class="fixed inset-0 pointer-events-none z-0 min-[900px]:hidden"
+    style="background: radial-gradient(circle 45vh at 50% 22.5vh, rgba(15, 58, 71, 0.6) 0%, rgba(15, 58, 71, 0.3) 45%, transparent 100%);"
+    aria-hidden="true"
+  ></div>
+
+  <!-- 2. Darkening gradient under text placed BEHIND canvas (z-index: 0): no foggy haze over house -->
+  <div
+    class="fixed inset-0 z-0 pointer-events-none hidden min-[900px]:block"
+    style="background: linear-gradient(90deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 95%, transparent) 35%, color-mix(in srgb, var(--bg) 40%, transparent) 46%, transparent 56%);"
+    aria-hidden="true"
+  ></div>
+
+  <!-- Mobile darkening gradient behind canvas (z-index: 0): transparent on top for house, darkens to --bg below for text -->
+  <div
+    class="fixed inset-0 z-0 pointer-events-none min-[900px]:hidden"
+    style="background: linear-gradient(to bottom, transparent 0%, transparent clamp(200px, 30svh, 320px), color-mix(in srgb, var(--bg) 90%, transparent) clamp(250px, 36svh, 380px), var(--bg) clamp(300px, 44svh, 460px));"
+    aria-hidden="true"
+  ></div>
+
+  <!-- 3. Fixed Fullscreen 3D Canvas Mount Point (z-index: 1, in front of background gradients, behind hero text) -->
+  <div
+    id="house-orb-container"
+    class="fixed inset-0 w-full h-full pointer-events-none z-[1] overflow-hidden"
+    aria-hidden="true"
+  ></div>
+
+  <!-- 4. Deep Vignette Layer behind content, gentle edges only -->
+  <div
+    class="fixed inset-0 z-0 pointer-events-none"
+    style="background: radial-gradient(circle at 65% 50%, transparent 55%, rgba(0, 0, 0, var(--vignette-opacity)) 100%);"
+    aria-hidden="true"
+  ></div>
+
+  <!-- 5. Static Film Grain Layer (z-index: 2, 3% opacity) -->
+  <div
+    class="film-grain-layer fixed inset-0 z-[2] pointer-events-none"
+    aria-hidden="true"
+  ></div>
+
+  <!-- Hero Section (Content with z-index: 10 on top of fixed canvas and scrims) -->
+  <section class="hero-section relative flex flex-col justify-start px-4 sm:px-6 lg:px-8 z-10">
+    <div class="max-w-7xl mx-auto w-full flex-grow flex flex-col min-[900px]:flex-row min-[900px]:items-stretch min-[900px]:justify-between gap-4 min-[900px]:gap-8 relative">
+      
+      <!-- #house-anchor:
+           Desktop (>= 900px): Right column, width 58%, full height of hero (min-height: min(100svh, 860px)), order-2
+           Mobile (< 900px): Immediately under header (padding-top: 64px), order-1 -->
+      <div
+        id="house-anchor"
+        class="w-full min-[900px]:w-[58%] min-[900px]:h-full min-[900px]:order-2 pointer-events-none flex-shrink-0 relative flex items-center justify-center overflow-visible"
+        aria-hidden="true"
+      >
+        <!-- Inline check: if reassembling from subpage, hide poster immediately before first paint -->
+        <script is:inline>
+          try {
+            if (sessionStorage.getItem('house_should_assemble') === '1') {
+              var p = document.getElementById('house-poster');
+              if (p) p.style.display = 'none';
+            }
+          } catch (e) {}
+        </script>
+
+        <!-- Dark poster with WebP house & soft breathing pulse: visible immediately until compileAsync & frame 1 -->
+        <div
+          id="house-poster"
+          class="w-full h-full flex items-center justify-center transition-opacity duration-500 ease-out"
+        >
+          <img
+            src="/house-poster.webp"
+            alt="3D Модель дома"
+            width="668"
+            height="774"
+            class="w-auto h-auto max-w-[90%] max-h-[90%] object-contain select-none house-poster-pulse"
+            loading="eager"
+            fetchpriority="high"
+            decoding="sync"
+          />
+        </div>
+      </div>
+
+      <!-- Text Column:
+           Desktop (>= 900px): Left column, width 42%, aligned to top with padding-top: clamp(88px, 12svh, 140px), order-1
+           Mobile (< 900px): Below house-anchor, order-2 -->
+      <div class="hero-text-col w-full min-[900px]:w-[42%] flex flex-col justify-start space-y-3 sm:space-y-4 min-[900px]:space-y-6 text-left relative z-[1] min-[900px]:order-1">
+        
+        <!-- Mobile order: дом -> бейдж -> заголовок -> кнопка -> описание -->
+        <!-- 1. Badge (order-1) -->
+        <div class="order-1 self-start inline-flex items-center gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-[var(--surface)] border border-[var(--border)] text-xs text-[var(--accent)] font-semibold shadow-sm backdrop-blur-md">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Справочные расчёты по СП и ГОСТ</span>
+        </div>
+
+        <!-- 2. Title (order-2) font: clamp(28px, 8vw, 34px) on mobile -->
+        <h1 class="order-2 text-[clamp(28px,8vw,34px)] sm:text-4xl min-[900px]:text-5xl lg:text-[3.25rem] font-black text-[var(--text)] tracking-tight leading-[1.12] drop-shadow-md">
+          Строительные калькуляторы онлайн по СП и ГОСТ
+        </h1>
+
+        <!-- 3. Button (order-3 on mobile <900px, order-4 on desktop >=900px) -->
+        <div class="order-3 min-[900px]:order-4 flex flex-wrap items-center gap-3 sm:gap-4 pt-1 sm:pt-2">
+          <a href="#calculators" class="btn-primary text-sm sm:text-base px-5 py-2.5 sm:px-6 sm:py-3">
+            Выбрать калькулятор
+          </a>
+          <a href="/o-proekte/" class="btn-secondary text-sm sm:text-base px-4 py-2.5 sm:px-5 sm:py-3">
+            Как мы считаем
+          </a>
+        </div>
+
+        <!-- 4. Description (order-4 on mobile <900px, font slightly smaller text-sm, order-3 on desktop >=900px, text-base/lg) -->
+        <p class="order-4 min-[900px]:order-3 text-sm sm:text-base min-[900px]:text-lg text-[var(--text-muted)] max-w-xl leading-relaxed drop-shadow">
+          Честные инженерные расчёты строительных материалов и несущих конструкций для частного домостроения. Бесплатно, без регистрации, с открытыми формулами и нормативной базой.
+        </p>
+
+        <!-- 5. Quick Trust Metrics (order-5) -->
+        <div class="order-5 pt-3 sm:pt-6 border-t border-[var(--border)] grid grid-cols-3 gap-2 sm:gap-4 max-w-md">
+          <div>
+            <div class="text-base sm:text-2xl font-black text-[var(--text)]">16</div>
+            <div class="text-[10px] sm:text-xs text-[var(--text-muted)] mt-0.5">калькуляторов</div>
+          </div>
+          <div>
+            <div class="text-base sm:text-2xl font-black text-emerald-400">100%</div>
+            <div class="text-[10px] sm:text-xs text-[var(--text-muted)] mt-0.5">бесплатно</div>
+          </div>
+          <div>
+            <div class="text-base sm:text-2xl font-black text-[var(--accent)]">СП / ГОСТ</div>
+            <div class="text-[10px] sm:text-xs text-[var(--text-muted)] mt-0.5">верифицировано</div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Recent Calculations Block ("Мой дом") if user saved calculations -->
+  <RecentCalculations />
+
+  <!-- Popular Calculators Grid -->
+  <section id="calculators" class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-16 scroll-mt-16">
+    <div class="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
+      <div>
+        <span class="text-xs font-bold uppercase tracking-wider text-[var(--accent)]">Быстрый старт</span>
+        <h2 class="text-2xl sm:text-3xl font-extrabold text-[var(--text)] tracking-tight mt-1">
+          Популярные калькуляторы
+        </h2>
+      </div>
+      <a href="/kalkulyatory/" class="text-xs sm:text-sm text-[var(--accent)] hover:underline font-semibold inline-flex items-center gap-1">
+        <span>Смотреть весь каталог (16 калькуляторов)</span>
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 12h14"/>
+          <path d="m12 5 7 7-7 7"/>
+        </svg>
+      </a>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {popularCalculators.map((calc) => (
+        <a
+          href={`/kalkulyatory/${calc.id}/`}
+          class="glass-card glass-card-hover rounded-2xl p-6 flex flex-col justify-between border border-[var(--border)] group min-h-[180px]"
+        >
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-3">
+              <span class="text-[11px] font-mono px-2 py-0.5 rounded-md bg-[var(--bg)] text-[var(--accent)] border border-[var(--border)]">
+                {calc.norm}
+              </span>
+              <span class="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">
+                {calc.category}
+              </span>
+            </div>
+            <h3 class="text-lg font-bold text-[var(--text)] group-hover:text-[var(--accent)] transition-colors mb-2">
+              {calc.title}
+            </h3>
+            <p class="text-xs text-[var(--text-muted)] leading-relaxed">
+              {calc.desc}
+            </p>
+          </div>
+          <div class="pt-4 mt-4 border-t border-[var(--border)] flex items-center justify-between text-xs text-[var(--text-muted)] group-hover:text-[var(--accent)] transition-colors">
+            <span>Рассчитать материал</span>
+            <span class="text-base group-hover:translate-x-1 transition-transform">→</span>
+          </div>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  <!-- All Calculators by Construction Stage -->
+  <section class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+    <div class="text-center max-w-2xl mx-auto mb-12">
+      <span class="text-xs font-bold uppercase tracking-wider text-[var(--accent)]">Пошаговый процесс</span>
+      <h2 class="text-2xl sm:text-3xl font-extrabold text-[var(--text)] tracking-tight mt-1">
+        Все калькуляторы по этапам стройки
+      </h2>
+      <p class="text-xs sm:text-sm text-[var(--text-muted)] mt-2">
+        От разметки фундамента и расчета глубины промерзания до сечения электрокабелей
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {constructionStages.map((block) => (
+        <div class="glass-card rounded-2xl p-6 border border-[var(--border)] flex flex-col">
+          <h3 class="text-base font-bold text-[var(--text)] pb-3 mb-3 border-b border-[var(--border)] flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-[var(--accent)]"></span>
+            {block.stage}
+          </h3>
+          <ul class="space-y-2.5 flex-grow">
+            {block.calcs.map((item) => (
+              <li>
+                <a
+                  href={`/kalkulyatory/${item.id}/`}
+                  class="group flex items-center justify-between gap-2 p-2 rounded-xl hover:bg-[var(--surface-hover)] transition-colors"
+                >
+                  <span class="text-xs sm:text-sm text-[var(--text)] group-hover:text-[var(--accent)] transition-colors font-medium">
+                    {item.title}
+                  </span>
+                  <span class="text-[10px] font-mono text-[var(--text-muted)] flex-shrink-0">
+                    {item.norm}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Trust Section (Why trust our math) -->
+  <section class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 border-t border-[var(--border)]">
+    <div class="glass-card rounded-3xl p-8 sm:p-12 border border-[var(--border)] shadow-xl">
+      <div class="max-w-2xl mb-10">
+        <span class="text-xs font-bold uppercase tracking-wider text-[var(--accent)]">Надёжность и прозрачность</span>
+        <h2 class="text-2xl sm:text-3xl font-extrabold text-[var(--text)] tracking-tight mt-1">
+          Почему можно доверять нашим расчётам?
+        </h2>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div class="space-y-2">
+          <div class="text-2xl font-bold text-[var(--accent)]">СП и ГОСТ</div>
+          <h3 class="text-sm font-semibold text-[var(--text)]">Привязка к государственным стандартам</h3>
+          <p class="text-xs text-[var(--text-muted)] leading-relaxed">
+            Мы опираемся на действующие СП 63, СП 20, СП 50 и ГОСТ. Если параметр является ориентировочным, мы явно помечаем его в интерфейсе.
+          </p>
+        </div>
+
+        <div class="space-y-2">
+          <div class="text-2xl font-bold text-cyan-400">100% Открыто</div>
+          <h3 class="text-sm font-semibold text-[var(--text)]">Формулы и логика вычислений</h3>
+          <p class="text-xs text-[var(--text-muted)] leading-relaxed">
+            Под каждым калькулятором приведён подробный текстовый разбор формул с примером расчёта с реальными числами.
+          </p>
+        </div>
+
+        <div class="space-y-2">
+          <div class="text-2xl font-bold text-emerald-400">Без БД и SMS</div>
+          <h3 class="text-sm font-semibold text-[var(--text)]">Конфиденциальность и скорость</h3>
+          <p class="text-xs text-[var(--text-muted)] leading-relaxed">
+            Никаких профилей, телефонных баз и спам-звонков от прорабов. Ваши расчеты происходят только в вашем браузере.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Partner Banner Slot -->
+  <section class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <PartnerBanner />
+  </section>
+
+  <!-- FAQ Section with Schema.org -->
+  <section class="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-12">
+    <div class="text-center mb-10">
+      <span class="text-xs font-bold uppercase tracking-wider text-[var(--accent)]">Вопросы и ответы</span>
+      <h2 class="text-2xl sm:text-3xl font-extrabold text-[var(--text)] tracking-tight mt-1">
+        Часто задаваемые вопросы
+      </h2>
+    </div>
+
+    <div class="space-y-4">
+      {faqItems.map((item) => (
+        <details class="glass-card rounded-2xl p-5 border border-[var(--border)] group">
+          <summary class="font-medium text-sm sm:text-base text-[var(--text)] cursor-pointer list-none flex items-center justify-between gap-4">
+            <span>{item.question}</span>
+            <span class="w-6 h-6 rounded-full bg-[var(--bg)] flex items-center justify-center text-[var(--accent)] group-open:rotate-180 transition-transform flex-shrink-0">
+              ↓
+            </span>
+          </summary>
+          <p class="mt-3 text-xs sm:text-sm text-[var(--text-muted)] leading-relaxed border-t border-[var(--border)] pt-3">
+            {item.answer}
+          </p>
+        </details>
+      ))}
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  // Dynamic import of Three.js and HouseOrb only on homepage
+  let currentHouseOrb: any = null;
+
+  function initHouseOrb() {
+    const container = document.getElementById('house-orb-container');
+    if (!container) return;
+    if (currentHouseOrb) return;
+
+    // Check prefers-reduced-motion
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      // Keep static poster visible
+      return;
+    }
+
+    // Check WebGL support
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (!gl) {
+      // Keep static poster visible
+      return;
+    }
+
+    // Lazy load Three.js & HouseOrb
+    import('../components/HouseOrb')
+      .then(({ HouseOrb }) => {
+        if (currentHouseOrb) {
+          currentHouseOrb.destroy();
+        }
+        currentHouseOrb = new HouseOrb({ container });
+      })
+      .catch((err) => {
+        console.warn('[HouseOrb] Dynamic import failed, keeping poster:', err);
+      });
+  }
+
+  function scheduleInit() {
+    let shouldFastInit = false;
+    try {
+      shouldFastInit = sessionStorage.getItem('house_should_assemble') === '1';
+    } catch (e) {}
+
+    if (shouldFastInit) {
+      // User returned from an internal page: assemble immediately without idle delay
+      initHouseOrb();
+      return;
+    }
+
+    // Wait for the first rendered frame so hero text and WebP poster are fully painted without JS delay
+    requestAnimationFrame(() => {
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(() => initHouseOrb(), { timeout: 1000 });
+      } else {
+        setTimeout(initHouseOrb, 50);
+      }
+    });
+  }
+
+  // Defer Three.js dynamic import until after first frame paint and idle
+  if (document.readyState === 'complete') {
+    scheduleInit();
+  } else {
+    window.addEventListener('load', scheduleInit, { once: true });
+  }
+
+  // Handle bfcache or back/forward navigation
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted || !document.getElementById('house-orb-container')?.querySelector('canvas')) {
+      initHouseOrb();
+    }
+  });
+
+  window.addEventListener('pagehide', () => {
+    if (currentHouseOrb) {
+      currentHouseOrb.destroy();
+      currentHouseOrb = null;
+    }
+  });
+</script>
+
+<style>
+  .hero-section {
+    min-height: min(100svh, 860px);
+  }
+
+  @keyframes housePulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.94;
+    }
+    50% {
+      transform: scale(1.015);
+      opacity: 1;
+    }
+  }
+
+  .house-poster-pulse {
+    animation: housePulse 3.8s ease-in-out infinite;
+    will-change: transform, opacity;
+  }
+
+  @media (min-width: 900px) {
+    .hero-section {
+      min-height: min(100svh, 860px);
+    }
+    .hero-text-col {
+      padding-top: clamp(88px, 12svh, 140px);
+    }
+    #house-anchor {
+      height: 100%;
+      min-height: min(100svh, 860px);
+    }
+  }
+
+  @media (max-width: 899px) {
+    .hero-section {
+      margin-top: -3.5rem; /* -56px pulls hero under transparent mobile header */
+      padding-top: 64px;   /* house immediately under header at top: 64px */
+    }
+    #house-anchor {
+      height: clamp(240px, 38svh, 340px);
+    }
+    .hero-text-col {
+      padding-top: 0.5rem;
+    }
+  }
+</style>

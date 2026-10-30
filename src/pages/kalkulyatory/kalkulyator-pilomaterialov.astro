@@ -1,0 +1,171 @@
+---
+import CalculatorLayout from '../../layouts/CalculatorLayout.astro';
+import { PilomaterialyCalculator } from '../../components/calculators/PilomaterialyCalculator';
+import { NORMATIVE_REGISTRY } from '../../data/norms';
+
+const normData = NORMATIVE_REGISTRY['kalkulyator-pilomaterialov'];
+
+const faq = [
+  {
+    question: 'Сколько штук обрезной доски 50х150х6000 в 1 кубе?',
+    answer: 'В одном кубическом метре ровно 22.22 штуки доски сечением 50×150 мм длиной 6 метров. При покупке на лесоторговых базах число округляют до целого значения — 22 штуки (что составляет 0.99 м³).'
+  },
+  {
+    question: 'Сколько штук бруса 150х150х6000 в одном кубическом метре?',
+    answer: 'Объём одного бруса 150×150 мм длиной 6 м равен: 0.15 × 0.15 × 6.0 = 0.135 м³. Соответственно, в 1 м³ содержится: 1 / 0.135 = 7.4 штуки (целых 7 штук).'
+  },
+  {
+    question: 'Сколько весит один куб сырой и сухой доски?',
+    answer: 'По ГОСТ 8486-86 масса свежеспиленной хвойной древесины (сосна, ель естественной влажности 60–80%) составляет от 750 до 850 кг/м³. Высушенная в камерной сушке древесина (влажность 12–15%) весит значительно меньше — около 480–520 кг/м³.'
+  },
+  {
+    question: 'Какой запас пиломатериалов закладывать на стропила и лаги?',
+    answer: 'Стандартный запас на торцовку, подрезку углов и отбраковку кривизны составляет 5–7%. Если закупается доска 2-го или 3-го сорта с возможным обзолом, дефектами геометрии или синевой, запас рекомендуется увеличить до 10–12%.'
+  },
+  {
+    question: 'В чем разница между обрезной и строганной доской?',
+    answer: 'Обрезная доска выходит из-под ленточной или дисковой пилорамы с шершавой поверхностью и допуском по геометрии ±2–3 мм. Строганная доска дополнительно пропускается через четырёхсторонний рейсмусовый станок, имеет идеально гладкую поверхность и точные калиброванные размеры (например, 45×140 вместо 50×150 мм).'
+  }
+];
+
+const related = [
+  { href: '/kalkulyatory/kalkulyator-krovli/', title: 'Калькулятор площади кровли', norm: 'СП 17.13330.2017' },
+  { href: '/kalkulyatory/kalkulyator-snegovoy-nagruzki/', title: 'Калькулятор снеговой нагрузки на стропила', norm: 'СП 20.13330.2016' },
+  { href: '/kalkulyatory/kalkulyator-betona/', title: 'Калькулятор доски для опалубки', norm: 'ГОСТ 7473-2010' },
+  { href: '/kalkulyatory/kalkulyator-utepleniya/', title: 'Калькулятор утепления перекрытий', norm: 'СП 50.13330.2012' },
+  { href: '/kalkulyatory/kalkulyator-lestnicy/', title: 'Калькулятор деревянной лестницы', norm: 'СП 55.13330.2016' },
+  { href: '/kalkulyatory/kalkulyator-kirpicha/', title: 'Калькулятор кирпичных стен', norm: 'ГОСТ 530-2012' }
+];
+---
+
+<CalculatorLayout
+  calculatorId="kalkulyator-pilomaterialov"
+  h1="Калькулятор пиломатериалов (доска, брус) онлайн"
+  title="Калькулятор пиломатериалов онлайн — по ГОСТ 8486-86"
+  description="Расчёт кубатуры пиломатериалов по ГОСТ 8486-86. Перевод штук в кубы и кубов в штуки, таблицы доски и бруса 6 метров, вес партии и площадь покрытия."
+  lead="Онлайн-калькулятор переводит штуки обрезной доски и бруса в кубические метры (м³) и обратно по номинальным размерам ГОСТ 8486-86 и ГОСТ 2695-83 с учётом влажности древесины и массы партии."
+  tldr="В 1 м³ обрезной доски 50×150×6000 мм содержится ровно 22,2 штуки. На стропильную систему дома 100 м² обычно требуется от 4,5 до 6 м³ обрезного пиломатериала (100–135 досок)."
+  updatedAt="2026-10-26"
+  norms={normData.normativeBasis}
+  faq={faq}
+  relatedCalculators={related}
+>
+  <div slot="calculator">
+    <PilomaterialyCalculator client:load />
+  </div>
+
+  <div slot="expert-content" class="space-y-6">
+    <h2 class="text-2xl font-bold text-white tracking-tight">
+      Инженерные правила расчёта кубатуры и штучности пиломатериалов
+    </h2>
+
+    <p>
+      Пиломатериалы (обрезная доска, брус, брусок) являются основным материалом для возведения стропильных систем, межэтажных балочных перекрытий, каркасных конструкций и съёмной опалубки фундаментов. На лесоторговых базах и пилорамах учёт и отпуск ведутся в кубических метрах ($м^3$), тогда как в строительном проекте и на стройплощадке оперируют штучным количеством элементов.
+    </p>
+
+    <h3 class="text-xl font-bold text-white tracking-tight">
+      1. Формула кубатуры одного элемента
+    </h3>
+    <p>
+      Объём любого обрезного пиломатериала прямоугольного сечения вычисляется по геометрической формуле объёма параллелепипеда:
+    </p>
+    <div class="p-4 rounded-xl bg-white/[0.04] border border-white/10 font-mono text-xs sm:text-sm text-amber-300">
+      V_1 = (a / 1000) · (b / 1000) · L
+    </div>
+    <p>
+      Где <code class="text-amber-300 font-mono">a</code> — толщина пиломатериала в мм, <code class="text-amber-300 font-mono">b</code> — ширина в мм, <code class="text-amber-300 font-mono">L</code> — стандартная длина в метрах (в РФ подавляющее большинство пиломатериалов выпускается длиной 6.0 метров с технологическим припуском на торцовку 5–10 см).
+    </p>
+    <p>
+      Количество штук пиломатериала в одном кубическом метре определяется обратной величиной:
+      <br />
+      <code class="text-amber-300 bg-white/5 px-2 py-1 rounded font-mono text-xs sm:text-sm">N_куб = 1 / V_1</code>
+    </p>
+
+    <h3 class="text-xl font-bold text-white tracking-tight">
+      2. Сводная таблица кубатуры и штук в 1 м³ для доски 6 метров (ГОСТ 8486-86)
+    </h3>
+    <div class="overflow-x-auto rounded-xl border border-white/10">
+      <table class="w-full text-xs text-left text-slate-300">
+        <thead class="bg-white/5 text-slate-200 uppercase text-[10px] tracking-wider border-b border-white/10">
+          <tr>
+            <th class="px-4 py-3">Сечение a × b, мм</th>
+            <th class="px-4 py-3">Длина, м</th>
+            <th class="px-4 py-3">Объём 1 шт, м³</th>
+            <th class="px-4 py-3">Штук в 1 м³ (точно)</th>
+            <th class="px-4 py-3">Площадь 1 шт, м²</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-white/5">
+          <tr>
+            <td class="px-4 py-2.5 font-bold text-white">25 × 100 (дюймовка)</td>
+            <td class="px-4 py-2.5">6.0</td>
+            <td class="px-4 py-2.5 font-mono text-amber-300">0.0150</td>
+            <td class="px-4 py-2.5 font-bold text-amber-400">66.6 шт</td>
+            <td class="px-4 py-2.5">0.60 м²</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-2.5 font-bold text-white">25 × 150</td>
+            <td class="px-4 py-2.5">6.0</td>
+            <td class="px-4 py-2.5 font-mono text-amber-300">0.0225</td>
+            <td class="px-4 py-2.5 font-bold text-amber-400">44.4 шт</td>
+            <td class="px-4 py-2.5">0.90 м²</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-2.5 font-bold text-white">40 × 150 (стропила/лаги)</td>
+            <td class="px-4 py-2.5">6.0</td>
+            <td class="px-4 py-2.5 font-mono text-amber-300">0.0360</td>
+            <td class="px-4 py-2.5 font-bold text-amber-400">27.7 шт</td>
+            <td class="px-4 py-2.5">0.90 м²</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-2.5 font-bold text-white">50 × 150 (ходовой размер)</td>
+            <td class="px-4 py-2.5">6.0</td>
+            <td class="px-4 py-2.5 font-mono text-amber-300">0.0450</td>
+            <td class="px-4 py-2.5 font-bold text-amber-400">22.2 шт</td>
+            <td class="px-4 py-2.5">0.90 м²</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-2.5 font-bold text-white">50 × 200 (балки перекрытий)</td>
+            <td class="px-4 py-2.5">6.0</td>
+            <td class="px-4 py-2.5 font-mono text-amber-300">0.0600</td>
+            <td class="px-4 py-2.5 font-bold text-amber-400">16.6 шт</td>
+            <td class="px-4 py-2.5">1.20 м²</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-2.5 font-bold text-white">100 × 100 (брус)</td>
+            <td class="px-4 py-2.5">6.0</td>
+            <td class="px-4 py-2.5 font-mono text-amber-300">0.0600</td>
+            <td class="px-4 py-2.5 font-bold text-amber-400">16.6 шт</td>
+            <td class="px-4 py-2.5">—</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-2.5 font-bold text-white">150 × 150 (брус капитальный)</td>
+            <td class="px-4 py-2.5">6.0</td>
+            <td class="px-4 py-2.5 font-mono text-amber-300">0.1350</td>
+            <td class="px-4 py-2.5 font-bold text-amber-400">7.4 шт</td>
+            <td class="px-4 py-2.5">—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="text-xl font-bold text-white tracking-tight">
+      3. Пошаговый практический пример: стропильная система на 42 стропильные ноги
+    </h3>
+    <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2 text-xs sm:text-sm">
+      <p><strong>Задача:</strong> Для двускатной кровли требуется 42 стропила длиной по 5.5 метров. Выбрана обрезная доска сечением 50×200 мм стандартной длины 6.0 м. Запас на подрезку конька и запилы мауэрлата — 5%.</p>
+      <p><strong>Шаг 1:</strong> Итоговое штучное число досок с запасом 5%: 42 × 1.05 = 44.1 → <strong>45 досок</strong>.</p>
+      <p><strong>Шаг 2:</strong> Объём одной доски 50×200×6000: 0.05 × 0.20 × 6.0 = <strong>0.06 м³</strong>.</p>
+      <p><strong>Шаг 3:</strong> Требуемый объём к заказу на лесобазе: 45 × 0.06 = <strong>2.70 м³</strong>.</p>
+      <p><strong>Шаг 4:</strong> Расчёт массы партии при естественной влажности (~780 кг/м³): 2.70 × 780 = <strong>2 106 кг</strong> (~2.1 тонны, потребуется бортовая «Газель» грузоподъемностью до 2.5 тонн).</p>
+    </div>
+
+    <h3 class="text-xl font-bold text-white tracking-tight">
+      4. Типичные ошибки при покупке пиломатериалов
+    </h3>
+    <ul class="list-disc list-inside space-y-2 pl-2 text-slate-300">
+      <li><strong>Путаница между номинальным и фактическим сечением:</strong> На рынках под видом доски «пятидесятки» (50 мм) нередко продают так называемый «армянский размер» или ТУ-доску толщиной 42–45 мм. На объёме 10 м³ недодача древесины может составлять до 1.5–2 кубов. Всегда контролируйте сечение штангенциркулем или рулеткой.</li>
+      <li><strong>Неправильное хранение на объекте:</strong> Доску естественной влажности нельзя оставлять в плотных заводских пачках на земле. В течение 7–10 суток в теплое время года древесина задыхается, покрывается синевой и плесенью. Штабель необходимо поднимать на прокладки минимум на 30 см от грунта и прокладывать рейками каждый ряд для сквозного проветривания.</li>
+    </ul>
+  </div>
+</CalculatorLayout>

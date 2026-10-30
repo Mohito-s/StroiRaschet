@@ -1,0 +1,109 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from '../components/common/Breadcrumbs.astro';
+import { SITE_NAME, CONTACT_EMAIL, OPERATOR_NAME } from '../config/site';
+
+const breadcrumbs = [
+  { name: 'Политика конфиденциальности', item: '/politika-konfidencialnosti/' }
+];
+---
+
+<BaseLayout
+  title="Политика конфиденциальности"
+  description="Политика конфиденциальности и обработки данных сайта: абсолютная прозрачность, отсутствие сбора персональных данных и работа без базы данных."
+  breadcrumbs={breadcrumbs}
+>
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <Breadcrumbs items={breadcrumbs} />
+
+    <header class="mt-4 mb-8">
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-3">
+        Политика конфиденциальности и защиты данных
+      </h1>
+      <p class="text-sm text-slate-400">
+        Дата вступления в силу: 26 октября 2026 г. | Редакция 1.0
+      </p>
+    </header>
+
+    <div class="glass-card rounded-2xl p-6 sm:p-8 space-y-8 text-slate-300 leading-relaxed text-sm sm:text-base border border-white/5">
+      <!-- Section 1 -->
+      <section class="space-y-3">
+        <h2 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          1. Главный принцип: Никакого сбора персональных данных
+        </h2>
+        <p>
+          Сайт <strong>{SITE_NAME}</strong> спроектирован на принципах максимальной приватности и открытости:
+        </p>
+        <ul class="list-disc list-inside space-y-1 text-slate-300 pl-2">
+          <li>Мы <strong>не собираем</strong> и не храним ваши персональные данные (ФИО, номера телефонов, паспортные данные, домашние адреса).</li>
+          <li>На сайте <strong>отсутствует регистрация, личные кабинеты, формы ввода личных контактов</strong> и скрытые профили пользователей.</li>
+          <li>На сайте <strong>нет базы данных</strong>: сайт является полностью статическим (Static Site Generation).</li>
+        </ul>
+      </section>
+
+      <!-- Section 2 -->
+      <section class="space-y-3">
+        <h2 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+          2. Где выполняются строительные расчёты?
+        </h2>
+        <p>
+          Все математические вычисления в калькуляторах выполняются <strong>исключительно в вашем браузере</strong> (на стороне клиента).
+        </p>
+        <p>
+          Вводимые вами размеры фундамента, площади стен, длины пролетов и марки материалов <strong>не отправляются на сервер</strong>, не анализируются и нигде не протоколируются. Как только вы закрываете вкладку браузера, данные выгружаются из оперативной памяти вашего устройства.
+        </p>
+      </section>
+
+      <!-- Section 3 -->
+      <section class="space-y-3">
+        <h2 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+          3. Локальное хранилище браузера (localStorage)
+        </h2>
+        <p>
+          Для вашего удобства сайт может сохранять исключительно технические пользовательские предпочтения в локальном хранилище вашего браузера (<code class="bg-white/10 px-1.5 py-0.5 rounded text-amber-300 text-xs">localStorage</code>):
+        </p>
+        <ul class="list-disc list-inside space-y-1 text-slate-300 pl-2">
+          <li>Выбранный оттенок 3D-модели дома на главной странице;</li>
+          <li>Факт закрытия баннера уведомления об использовании cookies;</li>
+          <li>Последние черновики введенных размеров в калькуляторах (чтобы не потерять ввод при случайном обновлении страницы).</li>
+        </ul>
+        <p class="text-xs text-slate-400 italic">
+          Эти данные никогда не передаются на внешние серверы и не идентифицируют вашу личность. Вы можете в любой момент нажать кнопку «Сбросить сохранённые данные браузера» в подвале сайта или очистить историю браузера.
+        </p>
+      </section>
+
+      <!-- Section 4 -->
+      <section class="space-y-3">
+        <h2 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+          4. Анонимная статистика посещаемости
+        </h2>
+        <p>
+          Для понимания общей популярности разделов и улучшения удобства калькуляторов на сайте может использоваться сервис обезличенной веб-аналитики (Яндекс.Метрика).
+        </p>
+        <p>
+          В соответствии со стандартами приватности в конфигурации счётчика <strong>строго отключена функция записи сессий и экрана (Webvisor выключен)</strong>. Аналитика оперирует исключительно агрегированными техническими показателями (тип браузера, разрешение экрана, глубина просмотра) без привязки к конкретному человеку.
+        </p>
+      </section>
+
+      <!-- Section 5 -->
+      <section class="space-y-3">
+        <h2 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+          5. Внешние ссылки и контакты
+        </h2>
+        <p>
+          Сайт может содержать партнерские ссылки на сервисы объявлений (например, профиль мастера на Авито). При переходе по внешним ссылкам начинает действовать политика конфиденциальности соответствующего ресурса.
+        </p>
+        <p>
+          Оператор сервиса: <strong>{OPERATOR_NAME}</strong>.<br />
+          По любым вопросам функционирования сайта вы можете написать напрямую на почту: 
+          <a href={`mailto:${CONTACT_EMAIL}`} class="text-amber-400 hover:underline">{CONTACT_EMAIL}</a>.
+        </p>
+      </section>
+    </div>
+  </div>
+</BaseLayout>

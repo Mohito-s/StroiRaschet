@@ -1,0 +1,126 @@
+---
+import BaseHead from '../components/seo/BaseHead.astro';
+import JsonLd, { type BreadcrumbItem, type FaqItem, type WebAppInfo } from '../components/seo/JsonLd.astro';
+import Header from '../components/common/Header.astro';
+import Footer from '../components/common/Footer.astro';
+import CookieBanner from '../components/privacy/CookieBanner.astro';
+import ThemeSwitcher from '../components/common/ThemeSwitcher.astro';
+import AtmosphereBackground from '../components/common/AtmosphereBackground.astro';
+import '../styles/global.css';
+
+export interface Props {
+  title: string;
+  description: string;
+  canonicalUrl?: string;
+  ogImage?: string;
+  ogType?: 'website' | 'article';
+  breadcrumbs?: BreadcrumbItem[];
+  faq?: FaqItem[];
+  webApp?: WebAppInfo;
+  publishedTime?: string;
+  modifiedTime?: string;
+}
+
+const {
+  title,
+  description,
+  canonicalUrl,
+  ogImage,
+  ogType = 'website',
+  breadcrumbs,
+  faq,
+  webApp,
+  publishedTime,
+  modifiedTime
+} = Astro.props;
+
+const isHome = Astro.url.pathname === '/' || Astro.url.pathname === '';
+---
+
+<!doctype html>
+<html lang="ru" data-theme="neon">
+  <head>
+    <!-- Instant theme initialization to eliminate flash of unstyled theme -->
+    <script is:inline>
+      (function() {
+        try {
+          var params = new URLSearchParams(window.location.search);
+          var themeUrl = params.get('theme');
+          var validThemes = ['neon', 'warm', 'forest', 'sunset', 'light'];
+          var theme = 'neon';
+          if (themeUrl && validThemes.indexOf(themeUrl) !== -1) {
+            theme = themeUrl;
+            localStorage.setItem('stroycalc_theme', theme);
+          } else {
+            var stored = localStorage.getItem('stroycalc_theme');
+            if (stored && validThemes.indexOf(stored) !== -1) {
+              theme = stored;
+            }
+          }
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch(e) {}
+      })();
+    </script>
+
+    <BaseHead
+      title={title}
+      description={description}
+      canonicalUrl={canonicalUrl}
+      ogImage={ogImage}
+      ogType={ogType}
+      publishedTime={publishedTime}
+      modifiedTime={modifiedTime}
+    />
+    <JsonLd
+      breadcrumbs={breadcrumbs}
+      faq={faq}
+      webApp={webApp}
+    />
+  </head>
+  <body class="bg-[var(--bg)] text-[var(--text)] min-h-[100svh] flex flex-col selection:bg-[var(--glow)] selection:text-[var(--text)] transition-colors duration-300 relative">
+    <!-- Non-WebGL fixed ambient blueprint atmosphere (internal pages only; home page has dedicated 3D scene) -->
+    {!isHome && <AtmosphereBackground />}
+
+    <!-- Skip to content for Accessibility -->
+    <a
+      href="#main-content"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-[var(--accent)] focus:text-[var(--btn-text)] focus:font-semibold focus:rounded-lg focus:shadow-lg"
+    >
+      Перейти к основному содержимому
+    </a>
+
+    <!-- Top Navigation Header -->
+    <Header />
+
+    <!-- Main Content Area -->
+    <main id="main-content" class="flex-1 flex flex-col relative z-10 page-transition-enter">
+      <slot />
+    </main>
+
+    <!-- Bottom Footer -->
+    <Footer />
+
+    <!-- Theme Switcher Widget -->
+    <ThemeSwitcher />
+
+    <!-- Privacy & Cookie Banner -->
+    <CookieBanner />
+
+    <!-- Global listener for navigation to home page to trigger house reverse assembly -->
+    <script is:inline>
+      document.addEventListener('click', function(e) {
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+        var a = e.target && e.target.closest ? e.target.closest('a') : null;
+        if (!a) return;
+        var href = a.getAttribute('href');
+        if (!href) return;
+        var targetPath = href.split('?')[0].split('#')[0];
+        if (targetPath === '/' || targetPath === window.location.origin + '/' || targetPath === '/index.html') {
+          try {
+            sessionStorage.setItem('house_should_assemble', '1');
+          } catch (err) {}
+        }
+      });
+    </script>
+  </body>
+</html>

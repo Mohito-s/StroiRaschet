@@ -1,0 +1,38 @@
+# === 1. DEPENDENCIES & CACHE ===
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# === 2. BUILD OUTPUTS & ASTRO ===
+dist/
+.astro/
+
+# === 3. SECRETS & ENVIRONMENT ===
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.token
+
+# === 4. AGENT MEMORY, PROMPTS & INTERNAL TRACKERS ===
+.agents/
+.agent/
+AGENTS.md
+WORKLOG_*.md
+PROGRESS_TRACKER.md
+PLAYBOOK_*.md
+*.prompt
+prompt_*.txt
+*.log
+
+# === 5. TEMPORARY ARTIFACTS & SYSTEM ===
+temp*
+user_inputs*
+test-results/
+playwright-report/
+preview_*.png
+.DS_Store
+Thumbs.db

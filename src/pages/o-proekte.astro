@@ -1,0 +1,96 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from '../components/common/Breadcrumbs.astro';
+import { SITE_NAME, CONTACT_EMAIL, TELEGRAM_URL } from '../config/site';
+
+const breadcrumbs = [
+  { name: 'О проекте', item: '/o-proekte/' }
+];
+---
+
+<BaseLayout
+  title="О проекте и методологии расчётов"
+  description="Миссия портала: открытые инженерные формулы, строгая нормативная база СП и ГОСТ, модульное тестирование расчётов и отсутствие скрытых алгоритмов."
+  breadcrumbs={breadcrumbs}
+>
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <Breadcrumbs items={breadcrumbs} />
+
+    <header class="mt-4 mb-8">
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-3">
+        О проекте {SITE_NAME}
+      </h1>
+      <p class="text-base text-slate-300 max-w-2xl leading-relaxed">
+        Инженерный онлайн-инструмент для частных застройщиков, прорабов и мастеров, созданный для честного и прозрачного расчёта строительных материалов и конструкций.
+      </p>
+    </header>
+
+    <div class="space-y-8">
+      <!-- 3 Pillars Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div class="glass-card p-6 rounded-2xl border border-white/5 space-y-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+            01
+          </div>
+          <h2 class="text-lg font-bold text-white">Нормы СП и ГОСТ</h2>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Мы не используем абстрактные усредненные цифры. Каждый расчет привязан к конкретному нормативному документу (СП 63, СП 20, ГОСТ 7473 и др.).
+          </p>
+        </div>
+
+        <div class="glass-card p-6 rounded-2xl border border-white/5 space-y-3">
+          <div class="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold">
+            02
+          </div>
+          <h2 class="text-lg font-bold text-white">Открытые формулы</h2>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Никаких «черных ящиков». На странице каждого калькулятора мы подробно описываем применяемые математические формулы, правила округления и технологический запас.
+          </p>
+        </div>
+
+        <div class="glass-card p-6 rounded-2xl border border-white/5 space-y-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+            03
+          </div>
+          <h2 class="text-lg font-bold text-white">Тестирование</h2>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Математическое ядро каждого калькулятора вынесено в изолированные функции и покрыто автоматическими unit-тестами с проверкой граничных значений.
+          </p>
+        </div>
+      </div>
+
+      <!-- Methodology Story -->
+      <article class="glass-card rounded-2xl p-6 sm:p-8 space-y-6 text-slate-300 leading-relaxed border border-white/5 text-sm sm:text-base">
+        <h2 class="text-xl font-bold text-white tracking-tight">
+          Как устроена методология расчётов?
+        </h2>
+        <p>
+          В интернете существуют сотни строительных калькуляторов, но большинство из них скрывают логику вычислений или используют устаревшие коэффициенты из советских справочников сорокалетней давности. Застройщик получает итоговую цифру и не может перепроверить, заложен ли в неё запас на подрезку, учтены ли нахлёсты арматуры или толщина растворного шва.
+        </p>
+        <p>
+          Мы пошли по пути полной прозрачности:
+        </p>
+        <ul class="list-disc list-inside space-y-2 text-slate-300 pl-2">
+          <li><strong>Единая база норм:</strong> мы актуализируем ссылки на Своды Правил (СП) вместо отмененных СНиП. Если коэффициент носит ориентировочный или рекомендательный характер (например, рецептура бетона Ц:П:Щ в ведрах), мы честно пишем об этом в интерфейсе.</li>
+          <li><strong>Учет строительной практики:</strong> формулы сочетают нормативную теоретическую основу со стандартными строительными припусками (запас кирпича на бой 5%, запас плитки при диагональной раскладке 15%, нахлесты кровельных листов).</li>
+          <li><strong>Без тормозов и рекламы со звуком:</strong> сайт не перегружен тяжелыми скриптами. Страницы отдают готовый HTML, чтобы работать мгновенно даже при слабом мобильном интернете на стройплощадке.</li>
+        </ul>
+
+        <div class="pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h3 class="text-sm font-semibold text-white">Хотите предложить улучшение?</h3>
+            <p class="text-xs text-slate-400">Мы открыты к диалогу с инженерами, проектировщиками и опытными строителями.</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <a href={`mailto:${CONTACT_EMAIL}`} class="btn-primary text-xs">
+              Написать на почту
+            </a>
+            <a href={TELEGRAM_URL} target="_blank" rel="noopener noreferrer" class="btn-secondary text-xs">
+              Telegram
+            </a>
+          </div>
+        </div>
+      </article>
+    </div>
+  </div>
+</BaseLayout>

@@ -1,0 +1,72 @@
+---
+---
+
+<div
+  id="house-svg-fallback"
+  class="absolute inset-0 z-0 pointer-events-none flex items-center justify-center overflow-hidden opacity-0 transition-opacity duration-500"
+  aria-hidden="true"
+>
+  <!-- Background radial glow -->
+  <div class="absolute w-[600px] h-[600px] rounded-full bg-gradient-to-b from-amber-500/15 via-cyan-500/10 to-transparent blur-3xl animate-pulse"></div>
+
+  <!-- Holographic SVG House -->
+  <div class="relative w-80 h-80 sm:w-96 sm:h-96 flex items-center justify-center">
+    <svg
+      viewBox="0 0 400 400"
+      class="w-full h-full drop-shadow-[0_0_35px_rgba(245,158,11,0.35)]"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <!-- Ground disk ellipse -->
+      <ellipse cx="200" cy="330" rx="140" ry="30" stroke="#38bdf8" stroke-width="2" stroke-dasharray="6 6" opacity="0.6" />
+      <ellipse cx="200" cy="330" rx="100" ry="20" stroke="#f59e0b" stroke-width="1.5" opacity="0.4" />
+
+      <!-- House Walls -->
+      <rect x="110" y="180" width="180" height="130" rx="4" stroke="#f59e0b" stroke-width="2.5" fill="rgba(245,158,11,0.03)" />
+      
+      <!-- Holographic Grid lines on walls -->
+      <line x1="110" y1="220" x2="290" y2="220" stroke="#f59e0b" stroke-width="1" stroke-dasharray="4 4" opacity="0.4" />
+      <line x1="110" y1="260" x2="290" y2="260" stroke="#f59e0b" stroke-width="1" stroke-dasharray="4 4" opacity="0.4" />
+      <line x1="170" y1="180" x2="170" y2="310" stroke="#f59e0b" stroke-width="1" stroke-dasharray="4 4" opacity="0.4" />
+      <line x1="230" y1="180" x2="230" y2="310" stroke="#f59e0b" stroke-width="1" stroke-dasharray="4 4" opacity="0.4" />
+
+      <!-- Gable Roof -->
+      <polygon points="200,90 90,185 310,185" stroke="#f59e0b" stroke-width="3" fill="rgba(56,189,248,0.04)" />
+      <line x1="200" y1="90" x2="200" y2="185" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.5" />
+      <line x1="145" y1="138" x2="255" y2="138" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.5" />
+
+      <!-- Chimney -->
+      <rect x="240" y="105" width="28" height="45" stroke="#f59e0b" stroke-width="2" fill="rgba(245,158,11,0.08)" />
+
+      <!-- Windows (glowing cyan cutouts) -->
+      <rect x="135" y="205" width="35" height="40" rx="3" stroke="#38bdf8" stroke-width="2" fill="rgba(56,189,248,0.2)" />
+      <line x1="152.5" y1="205" x2="152.5" y2="245" stroke="#38bdf8" stroke-width="1" />
+      <line x1="135" y1="225" x2="170" y2="225" stroke="#38bdf8" stroke-width="1" />
+
+      <rect x="230" y="205" width="35" height="40" rx="3" stroke="#38bdf8" stroke-width="2" fill="rgba(56,189,248,0.2)" />
+      <line x1="247.5" y1="205" x2="247.5" y2="245" stroke="#38bdf8" stroke-width="1" />
+      <line x1="230" y1="225" x2="265" y2="225" stroke="#38bdf8" stroke-width="1" />
+
+      <!-- Door -->
+      <rect x="182" y="240" width="36" height="70" rx="2" stroke="#38bdf8" stroke-width="2" fill="rgba(56,189,248,0.15)" />
+      <circle cx="210" cy="275" r="2.5" fill="#f59e0b" />
+    </svg>
+  </div>
+</div>
+
+<style>
+  @keyframes holoBreathe {
+    0%, 100% {
+      transform: scale(1);
+      filter: brightness(1);
+    }
+    50% {
+      transform: scale(1.03);
+      filter: brightness(1.2);
+    }
+  }
+
+  #house-svg-fallback svg {
+    animation: holoBreathe 4s ease-in-out infinite;
+  }
+</style>

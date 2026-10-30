@@ -1,0 +1,43 @@
+---
+export interface BreadcrumbItem {
+  name: string;
+  item: string;
+}
+
+export interface Props {
+  items: BreadcrumbItem[];
+}
+
+const { items } = Astro.props;
+---
+
+<nav aria-label="Хлебные крошки" class="py-3 px-1 text-xs text-[var(--text-muted)] overflow-x-auto whitespace-nowrap scrollbar-none">
+  <ol class="inline-flex items-center gap-1.5" itemscope itemtype="https://schema.org/BreadcrumbList">
+    <li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" class="inline-flex items-center">
+      <a href="/" itemprop="item" class="text-[var(--text-muted)] hover:text-[var(--text)] transition-colors flex items-center gap-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+        <span itemprop="name">Главная</span>
+      </a>
+      <meta itemprop="position" content="1" />
+    </li>
+
+    {items.map((crumb, idx) => (
+      <li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" class="inline-flex items-center">
+        <span class="mx-1 text-[var(--text-muted)] opacity-50">/</span>
+        {idx === items.length - 1 ? (
+          <span itemprop="name" class="text-[var(--accent)] font-semibold" aria-current="page">
+            {crumb.name}
+          </span>
+        ) : (
+          <a href={crumb.item} itemprop="item" class="text-[var(--text-muted)] hover:text-[var(--text)] transition-colors">
+            <span itemprop="name">{crumb.name}</span>
+          </a>
+        )}
+        <meta itemprop="position" content={String(idx + 2)} />
+      </li>
+    ))}
+  </ol>
+</nav>

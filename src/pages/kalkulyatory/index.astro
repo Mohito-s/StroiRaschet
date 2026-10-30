@@ -1,0 +1,439 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../../components/common/Breadcrumbs.astro';
+
+const breadcrumbs = [
+  { name: 'Каталог калькуляторов', item: '/kalkulyatory/' }
+];
+
+const popularIds = new Set(['kalkulyator-betona', 'kalkulyator-kirpicha', 'kalkulyator-pilomaterialov']);
+
+const categories = [
+  {
+    id: 'fundament',
+    name: '1. Нулевой цикл и фундамент',
+    shortName: 'Фундамент',
+    desc: 'Надёжная основа дома: бетонная смесь, прутки арматуры, глубина промерзания грунта и септик.',
+    icon: 'cube',
+    tintClass: 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10',
+    count: 4,
+    items: [
+      {
+        id: 'kalkulyator-betona',
+        title: 'Бетон для фундамента',
+        norm: 'ГОСТ 7473-2010',
+        desc: 'Считает точную кубатуру ленты, плиты или столбов, вес смеси и нужное число автобетоносмесителей.',
+        ready: true,
+        icon: 'cube'
+      },
+      {
+        id: 'kalkulyator-armatury',
+        title: 'Арматурный каркас фундамента',
+        norm: 'СП 63.13330.2018',
+        desc: 'Погонная длина и вес прутков A500C, количество угловых нахлёстов, хомутов и защитный слой бетона.',
+        ready: false,
+        icon: 'grid'
+      },
+      {
+        id: 'kalkulyator-glubiny-promerzaniya',
+        title: 'Глубина промерзания грунта',
+        norm: 'СП 22.13330.2016',
+        desc: 'Расчёт нормативной глубины зимнего промерзания суглинков, супесей и песков по региону РФ.',
+        ready: false,
+        icon: 'thermometer'
+      },
+      {
+        id: 'kalkulyator-septika',
+        title: 'Септик и очистные сооружения',
+        norm: 'СП 32.13330.2018',
+        desc: 'Трёхсуточный объём стоков на семью, диаметр бетонных колец и площадь поля фильтрации.',
+        ready: false,
+        icon: 'droplet'
+      }
+    ]
+  },
+  {
+    id: 'steny',
+    name: '2. Стены и перекрытия',
+    shortName: 'Стены',
+    desc: 'Коробка дома: одинарный и полуторный кирпич, газобетонные блоки и деревянный брус.',
+    icon: 'layers',
+    tintClass: 'border-amber-500/30 text-amber-400 bg-amber-500/10',
+    count: 3,
+    items: [
+      {
+        id: 'kalkulyator-kirpicha',
+        title: 'Кирпичная кладка стен',
+        norm: 'ГОСТ 530-2012',
+        desc: 'Расчёт рядового и лицевого кирпича с вычетом оконных проёмов, толщиной шва 10 мм и запасом на бой.',
+        ready: true,
+        icon: 'layers'
+      },
+      {
+        id: 'kalkulyator-gazobetona',
+        title: 'Газобетонные блоки (D400–D600)',
+        norm: 'ГОСТ 31360-2007',
+        desc: 'Кубатура блоков, расход полиуретанового клея или смеси и проверка армирования каждые 3 ряда.',
+        ready: false,
+        icon: 'box'
+      },
+      {
+        id: 'kalkulyator-pilomaterialov',
+        title: 'Пиломатериалы: брус и доска',
+        norm: 'ГОСТ 8486-86',
+        desc: 'Мгновенный перевод штук в кубические метры и обратно, расчёт веса партии и площади обшивки.',
+        ready: true,
+        icon: 'columns'
+      }
+    ]
+  },
+  {
+    id: 'krovlya',
+    name: '3. Кровля и стропила',
+    shortName: 'Кровля',
+    desc: 'Геометрия скатов, площадь финишного покрытия и проверка снегового давления.',
+    icon: 'triangle',
+    tintClass: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
+    count: 2,
+    items: [
+      {
+        id: 'kalkulyator-krovli',
+        title: 'Геометрическая площадь кровли',
+        norm: 'СП 17.13330.2017',
+        desc: 'Двускатная, вальмовая и односкатная крыша: площадь скатов с учётом карнизов, фронтонов и уклона.',
+        ready: false,
+        icon: 'triangle'
+      },
+      {
+        id: 'kalkulyator-snegovoy-nagruzki',
+        title: 'Снеговая нагрузка на стропила',
+        norm: 'СП 20.13330.2016',
+        desc: 'Давление снежной шапки по снеговым зонам I–VIII и понижающий коэффициент уклона крыши.',
+        ready: false,
+        icon: 'cloud-snow'
+      }
+    ]
+  },
+  {
+    id: 'otdelka',
+    name: '4. Утепление и отделка',
+    shortName: 'Отделка',
+    desc: 'Тепловой контур, сухие смеси, наливные полы, плитка и безопасная лестница.',
+    icon: 'spark',
+    tintClass: 'border-purple-500/30 text-purple-400 bg-purple-500/10',
+    count: 5,
+    items: [
+      {
+        id: 'kalkulyator-utepleniya',
+        title: 'Теплоизоляция стен (ГСОП)',
+        norm: 'СП 50.13330.2012',
+        desc: 'Толщина минеральной ваты или PIR для стен по градусо-суткам вашего климатического района.',
+        ready: false,
+        icon: 'shield'
+      },
+      {
+        id: 'kalkulyator-styazhki',
+        title: 'Цементная стяжка пола',
+        norm: 'СП 29.13330.2011',
+        desc: 'Объём песчано-цементной смеси (М150–М200), количество мешков по 25/50 кг и фиброволокно.',
+        ready: false,
+        icon: 'square'
+      },
+      {
+        id: 'kalkulyator-shtukaturki',
+        title: 'Штукатурка стен по маякам',
+        norm: 'СП 71.13330.2017',
+        desc: 'Расход гипсовой (Ротбанд) или цементной смеси по средней кривизне стен и площади простенков.',
+        ready: false,
+        icon: 'feather'
+      },
+      {
+        id: 'kalkulyator-plitki',
+        title: 'Плитка и эпоксидная затирка',
+        norm: 'СП 71.13330.2017',
+        desc: 'Количество керамогранита с запасом 10–15% на диагональную подрезку и килограммы затирки швов.',
+        ready: false,
+        icon: 'grid'
+      },
+      {
+        id: 'kalkulyator-lestnicy',
+        title: 'Эргономика межэтажной лестницы',
+        norm: 'СП 55.13330.2016',
+        desc: 'Безопасная формула шага Блонделя (2h + s = 63 см), угол наклона, высота ступеней и проём перекрытия.',
+        ready: false,
+        icon: 'stairs'
+      }
+    ]
+  },
+  {
+    id: 'inzheneriya',
+    name: '5. Инженерные сети',
+    shortName: 'Инженерия',
+    desc: 'Вентиляция жилых помещений и электрические кабельные линии.',
+    icon: 'zap',
+    tintClass: 'border-rose-500/30 text-rose-400 bg-rose-500/10',
+    count: 2,
+    items: [
+      {
+        id: 'kalkulyator-ventilyacii',
+        title: 'Вентиляция и воздухообмен',
+        norm: 'СП 60.13330.2020',
+        desc: 'Объём свежего притока в м³/ч по числу жильцов и комнат, диаметры приточных и вытяжных каналов.',
+        ready: false,
+        icon: 'wind'
+      },
+      {
+        id: 'kalkulyator-secheniya-kabelya',
+        title: 'Сечение медного кабеля (ВВГнг)',
+        norm: 'ПУЭ / ГОСТ 31996',
+        desc: 'Подбор сечения жилы (1.5, 2.5, 4, 6 мм²) по потребляемой мощности нагрузки и падению напряжения.',
+        ready: false,
+        icon: 'zap'
+      }
+    ]
+  }
+];
+---
+
+<BaseLayout
+  title="Каталог строительных калькуляторов онлайн по СП и ГОСТ"
+  description="Полный перечень инженерных онлайн-калькуляторов: фундамент, бетон, кирпич, пиломатериалы, кровля, утепление, стяжка и электрика. Точные формулы без регистрации."
+  breadcrumbs={breadcrumbs}
+>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow space-y-8">
+    <Breadcrumbs items={breadcrumbs} />
+
+    <!-- Hero Header -->
+    <header class="space-y-4">
+      <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--surface)] border border-[var(--border)] text-xs text-[var(--accent)] font-semibold shadow-sm">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>16 инженерных калькуляторов по актуальным нормам СП и ГОСТ</span>
+      </div>
+
+      <h1 class="text-3xl sm:text-5xl font-black text-[var(--text)] tracking-tight leading-tight">
+        Каталог строительных калькуляторов
+      </h1>
+
+      <p class="text-base sm:text-lg text-[var(--text-muted)] max-w-3xl leading-relaxed">
+        Все расчёты разделены по реальным этапам стройки — от котлована до выключателей. Простые и понятные вопросы, открытые формулы и мгновенный результат за 30 секунд.
+      </p>
+    </header>
+
+    <!-- Sticky Search & Filter Chips Bar (remains on top during scroll) -->
+    <div class="sticky top-16 z-30 py-3.5 px-3 sm:px-5 bg-[var(--bg)]/90 backdrop-blur-xl border-y sm:border border-[var(--border)] sm:rounded-2xl shadow-md transition-all max-w-full">
+      <div class="max-w-7xl mx-auto space-y-3 min-w-0">
+        <!-- Search Input -->
+        <div class="relative max-w-xl">
+          <input
+            type="text"
+            id="catalog-search"
+            placeholder="Поиск калькулятора (бетон, кирпич, доска)..."
+            class="w-full px-4 py-3 pl-11 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] placeholder-[var(--text-muted)] focus:border-[var(--accent)] focus:outline-none transition-all shadow-inner text-base min-h-[44px]"
+          />
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[var(--text-muted)] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.3-4.3"/>
+          </svg>
+        </div>
+
+        <!-- Filter Chips with Category Counts (Horizontal scrollable with smooth touch) -->
+        <div class="flex items-center gap-2 pt-0.5 overflow-x-auto no-scrollbar scroll-smooth max-w-full pb-1">
+          <button type="button" data-filter="all" class="filter-chip active-filter px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-[var(--accent)] text-[var(--btn-text)] transition-all min-h-[36px] cursor-pointer shadow-sm flex-shrink-0">
+            Все этапы (16)
+          </button>
+          {categories.map((cat) => (
+            <button
+              type="button"
+              data-filter={cat.id}
+              class="filter-chip px-3.5 py-1.5 rounded-xl text-xs font-medium bg-[var(--surface)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] transition-all min-h-[36px] cursor-pointer flex-shrink-0"
+            >
+              {cat.shortName} ({cat.count})
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    <!-- Categories Grid Sections -->
+    <div class="space-y-12" id="catalog-container">
+      {categories.map((cat) => (
+        <section id={cat.id} class="category-section space-y-5 scroll-mt-36 min-w-0 max-w-full" data-category={cat.id}>
+          <!-- Section Header with Stage Icon & Counter -->
+          <div class="pb-3 border-b border-[var(--border)] flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 min-w-0">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class={`w-10 h-10 rounded-xl border flex items-center justify-center font-bold shadow-sm flex-shrink-0 ${cat.tintClass}`}>
+                {cat.id === 'fundament' && (
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                )}
+                {cat.id === 'steny' && (
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                )}
+                {cat.id === 'krovlya' && (
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                )}
+                {cat.id === 'otdelka' && (
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                )}
+                {cat.id === 'inzheneriya' && (
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                )}
+              </div>
+              <div class="min-w-0">
+                <h2 class="text-lg sm:text-2xl font-black text-[var(--text)] tracking-tight truncate sm:whitespace-normal">
+                  {cat.name}
+                </h2>
+                <p class="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5 line-clamp-1 sm:line-clamp-none">
+                  {cat.desc}
+                </p>
+              </div>
+            </div>
+            
+            <!-- Right Counter Badge -->
+            <span class="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-[var(--surface)] border border-[var(--border)] text-[var(--accent)] shrink-0 self-start sm:self-center">
+              {cat.count} {cat.count === 2 || cat.count === 3 || cat.count === 4 ? 'калькулятора' : 'калькуляторов'}
+            </span>
+          </div>
+
+          <!-- Cards Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {cat.items.map((item) => {
+              const isPopular = popularIds.has(item.id);
+              return (
+                <a
+                  href={`/kalkulyatory/${item.id}/`}
+                  class="calc-card glass-card glass-card-hover p-6 rounded-2xl flex flex-col justify-between group min-h-[190px] relative border border-[var(--border)]"
+                  data-title={item.title.toLowerCase()}
+                  data-norm={item.norm.toLowerCase()}
+                  data-desc={item.desc.toLowerCase()}
+                >
+                  <div>
+                    <div class="flex items-center justify-between gap-2 mb-3">
+                      <!-- Standard Norm Badge -->
+                      <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--bg)] text-[var(--accent)] border border-[var(--border)]">
+                        {item.norm}
+                      </span>
+
+                      <!-- Popular / Time Badge -->
+                      <div class="flex items-center gap-1.5">
+                        {isPopular && (
+                          <span class="text-[9px] font-bold uppercase tracking-wider text-amber-300 bg-amber-400/15 px-2 py-0.5 rounded-full border border-amber-400/30">
+                            ★ Популярное
+                          </span>
+                        )}
+                        <span class="text-[10px] text-[var(--text-muted)] font-medium">
+                          Результат за 30 секунд
+                        </span>
+                      </div>
+                    </div>
+
+                    <h3 class="text-base font-bold text-[var(--text)] group-hover:text-[var(--accent)] transition-colors mb-2">
+                      {item.title}
+                    </h3>
+
+                    <p class="text-xs text-[var(--text-muted)] leading-relaxed">
+                      {item.desc}
+                    </p>
+                  </div>
+
+                  <div class="pt-4 mt-4 border-t border-[var(--border)] flex items-center justify-between text-xs text-[var(--text-muted)] group-hover:text-[var(--accent)] transition-colors font-medium">
+                    <span>Рассчитать материал</span>
+                    <span class="text-base group-hover:translate-x-1.5 transition-transform">→</span>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        </section>
+      ))}
+    </div>
+
+    <!-- Empty search fallback state -->
+    <div id="no-search-results" class="hidden text-center py-16 glass-card rounded-2xl border border-[var(--border)]">
+      <p class="text-base text-[var(--text)] font-semibold">По вашему запросу калькуляторов не найдено</p>
+      <p class="text-xs text-[var(--text-muted)] mt-1">Попробуйте ввести другое название (например: «бетон», «доска», «кровля») или выберите фильтр по этапу выше</p>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  // Fast client-side search and category filtering
+  const searchInput = document.getElementById('catalog-search') as HTMLInputElement;
+  const chips = document.querySelectorAll<HTMLButtonElement>('.filter-chip');
+  const sections = document.querySelectorAll<HTMLElement>('.category-section');
+  const noResults = document.getElementById('no-search-results');
+
+  let activeCategory = 'all';
+  let searchQuery = '';
+
+  function filterCards() {
+    let totalVisible = 0;
+
+    sections.forEach((section) => {
+      const sectionCat = section.getAttribute('data-category');
+      const matchesCategory = activeCategory === 'all' || activeCategory === sectionCat;
+
+      if (!matchesCategory) {
+        section.classList.add('hidden');
+        return;
+      }
+
+      const cards = section.querySelectorAll<HTMLElement>('.calc-card');
+      let sectionVisibleCount = 0;
+
+      cards.forEach((card) => {
+        const title = card.getAttribute('data-title') || '';
+        const norm = card.getAttribute('data-norm') || '';
+        const desc = card.getAttribute('data-desc') || '';
+
+        const matchesSearch =
+          searchQuery === '' ||
+          title.includes(searchQuery) ||
+          norm.includes(searchQuery) ||
+          desc.includes(searchQuery);
+
+        if (matchesSearch) {
+          card.classList.remove('hidden');
+          sectionVisibleCount++;
+          totalVisible++;
+        } else {
+          card.classList.add('hidden');
+        }
+      });
+
+      if (sectionVisibleCount > 0) {
+        section.classList.remove('hidden');
+      } else {
+        section.classList.add('hidden');
+      }
+    });
+
+    if (noResults) {
+      if (totalVisible === 0) {
+        noResults.classList.remove('hidden');
+      } else {
+        noResults.classList.add('hidden');
+      }
+    }
+  }
+
+  // Search input handler with debounce
+  searchInput?.addEventListener('input', (e) => {
+    searchQuery = (e.target as HTMLInputElement).value.trim().toLowerCase();
+    filterCards();
+  });
+
+  // Filter chips handler
+  chips.forEach((chip) => {
+    chip.addEventListener('click', () => {
+      chips.forEach((c) => {
+        c.classList.remove('bg-[var(--accent)]', 'text-[var(--btn-text)]', 'font-semibold');
+        c.classList.add('bg-[var(--surface)]', 'text-[var(--text-muted)]', 'font-medium');
+      });
+      chip.classList.remove('bg-[var(--surface)]', 'text-[var(--text-muted)]', 'font-medium');
+      chip.classList.add('bg-[var(--accent)]', 'text-[var(--btn-text)]', 'font-semibold');
+
+      activeCategory = chip.getAttribute('data-filter') || 'all';
+      filterCards();
+    });
+  });
+</script>

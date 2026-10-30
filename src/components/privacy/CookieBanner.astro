@@ -1,0 +1,81 @@
+---
+import { YANDEX_METRIKA_ID } from '../../config/site';
+---
+
+<div
+  id="cookie-banner"
+  class="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-50 transform translate-y-32 opacity-0 transition-all duration-300 pointer-events-none"
+  role="region"
+  aria-label="Уведомление об использовании cookies и локального хранилища"
+>
+  <div class="glass-card p-4 rounded-2xl border border-white/10 shadow-2xl bg-[#090e1a]/95 flex flex-col gap-3">
+    <div class="flex items-start gap-3">
+      <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 16v-4"/>
+          <path d="M12 8h.01"/>
+        </svg>
+      </div>
+      <p class="text-xs text-slate-300 leading-relaxed">
+        Мы используем технические cookie и анонимную статистику Яндекс.Метрики без сбора персональных данных для улучшения расчетов. Подробнее — в 
+        <a href="/politika-konfidencialnosti/" class="text-amber-400 hover:underline">политике</a>.
+      </p>
+    </div>
+    <div class="flex items-center justify-end gap-2">
+      <button
+        id="accept-cookie-btn"
+        type="button"
+        class="min-h-[44px] px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-semibold transition-colors"
+      >
+        Понятно
+      </button>
+    </div>
+  </div>
+</div>
+
+<script define:vars={{ metrikaId: YANDEX_METRIKA_ID }}>
+  // Check localStorage and show banner if not accepted
+  const banner = document.getElementById('cookie-banner');
+  const btn = document.getElementById('accept-cookie-btn');
+
+  function initMetrika() {
+    if (!metrikaId || window.__metrika_loaded) return;
+    window.__metrika_loaded = true;
+
+    // Lazy load Yandex Metrika with zero webvisor/session recordings
+    (function(m,e,t,r,i,k,a){
+      m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+      m[i].l=1*new Date();
+      for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+      k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+    })(window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+
+    ym(metrikaId, "init", {
+      clickmap: true,
+      trackLinks: true,
+      accurateTrackBounce: true,
+      webvisor: false // Строго выключен согласно правилам приватности
+    });
+  }
+
+  if (localStorage.getItem('cookieAccepted') === '1') {
+    // Already accepted, lazy load analytics 3s after load or user interaction
+    setTimeout(initMetrika, 3000);
+  } else {
+    // Show banner after 1s
+    setTimeout(() => {
+      if (banner) {
+        banner.classList.remove('translate-y-32', 'opacity-0', 'pointer-events-none');
+      }
+    }, 1000);
+  }
+
+  if (btn && banner) {
+    btn.addEventListener('click', () => {
+      localStorage.setItem('cookieAccepted', '1');
+      banner.classList.add('translate-y-32', 'opacity-0', 'pointer-events-none');
+      initMetrika();
+    });
+  }
+</script>

@@ -1,0 +1,59 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const popularCalculators = [
+  { href: '/kalkulyatory/kalkulyator-betona/', title: 'Калькулятор бетона для фундамента', norm: 'ГОСТ 7473-2010' },
+  { href: '/kalkulyatory/kalkulyator-kirpicha/', title: 'Калькулятор кирпичной кладки', norm: 'ГОСТ 530-2012' },
+  { href: '/kalkulyatory/kalkulyator-pilomaterialov/', title: 'Калькулятор пиломатериалов (кубатура)', norm: 'ГОСТ 8486-86' },
+  { href: '/kalkulyatory/kalkulyator-krovli/', title: 'Калькулятор площади кровли', norm: 'СП 17.13330.2017' },
+  { href: '/kalkulyatory/kalkulyator-utepleniya/', title: 'Теплотехнический расчёт стены', norm: 'СП 50.13330.2012' },
+  { href: '/kalkulyatory/kalkulyator-armatury/', title: 'Калькулятор арматуры для фундамента', norm: 'СП 63.13330.2018' },
+];
+---
+
+<BaseLayout
+  title="Страница не найдена (404)"
+  description="Запрошенная страница не найдена или была перемещена. Перейдите в каталог инженерных строительных калькуляторов портала СтройРасчёт."
+>
+  <div class="max-w-4xl mx-auto px-4 py-20 text-center flex-grow flex flex-col items-center justify-center">
+    <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 mb-6">
+      <span class="text-3xl font-black">404</span>
+    </div>
+
+    <h1 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-4">
+      Страница не найдена
+    </h1>
+
+    <p class="text-slate-400 max-w-lg mx-auto mb-10 text-base leading-relaxed">
+      Возможно, адрес был введен с ошибкой или страница была перемещена. Выберите нужный калькулятор из списка ниже или вернитесь на главную.
+    </p>
+
+    <div class="w-full text-left mb-10">
+      <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4 text-center">
+        Популярные калькуляторы
+      </h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+        {popularCalculators.map((calc) => (
+          <a
+            href={calc.href}
+            class="glass-card glass-card-hover p-4 rounded-xl block border border-white/5 group"
+          >
+            <span class="text-xs text-cyan-400 font-mono block mb-1">{calc.norm}</span>
+            <span class="text-sm font-medium text-white group-hover:text-amber-400 transition-colors block">
+              {calc.title}
+            </span>
+          </a>
+        ))}
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center justify-center gap-4">
+      <a href="/" class="btn-primary">
+        На главную страницу
+      </a>
+      <a href="/kalkulyatory/" class="btn-secondary">
+        Перейти в каталог калькуляторов
+      </a>
+    </div>
+  </div>
+</BaseLayout>

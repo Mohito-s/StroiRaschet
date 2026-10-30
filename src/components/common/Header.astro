@@ -1,0 +1,206 @@
+---
+import { SITE_NAME } from '../../config/site';
+import { THEME_PRESETS } from '../../config/theme';
+
+const presets = Object.values(THEME_PRESETS);
+
+const navLinks = [
+  { href: '/kalkulyatory/', label: 'Калькуляторы' },
+  { href: '/normy/', label: 'Нормативы СП/ГОСТ' },
+  { href: '/o-proekte/', label: 'О проекте' },
+  { href: '/kontakty/', label: 'Контакты' },
+];
+
+const currentPath = Astro.url.pathname;
+---
+
+<header class="sticky top-0 z-40 w-full glass-card border-b border-[var(--border)] bg-[var(--surface)] backdrop-blur-md">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between">
+    <!-- Logo -->
+    <a href="/" class="flex items-center gap-2.5 sm:gap-3 group focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded-lg p-0.5 sm:p-1" title={`${SITE_NAME} — на главную`}>
+      <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-[8px] sm:rounded-[10px] bg-transparent border border-[var(--border)] flex items-center justify-center group-hover:border-[var(--accent)] transition-colors">
+        <svg class="w-5 h-5 sm:w-7 sm:h-7 transition-transform group-hover:scale-105" width="28" height="28" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <g fill="var(--accent)">
+            <rect x="17" y="2" width="6" height="6" rx="1.5"/>
+            <rect x="9.5" y="9.5" width="6" height="6" rx="1.5"/>
+            <rect x="17" y="9.5" width="6" height="6" rx="1.5"/>
+            <rect x="24.5" y="9.5" width="6" height="6" rx="1.5"/>
+            <rect x="2" y="17" width="6" height="6" rx="1.5"/>
+            <rect x="9.5" y="17" width="6" height="6" rx="1.5"/>
+            <rect x="17" y="17" width="6" height="6" rx="1.5"/>
+            <rect x="24.5" y="17" width="6" height="6" rx="1.5"/>
+            <rect x="32" y="17" width="6" height="6" rx="1.5"/>
+            <rect x="9.5" y="24.5" width="6" height="6" rx="1.5"/>
+            <rect x="24.5" y="24.5" width="6" height="6" rx="1.5"/>
+            <rect x="9.5" y="32" width="6" height="6" rx="1.5"/>
+            <rect x="24.5" y="32" width="6" height="6" rx="1.5"/>
+          </g>
+          <rect x="17" y="24.5" width="6" height="6" rx="1.5" fill="#ff9f43"/>
+        </svg>
+      </div>
+      <div class="flex flex-col">
+        <span class="text-base sm:text-lg font-bold tracking-tight text-[var(--text)] group-hover:text-[var(--accent)] transition-colors leading-tight">
+          {SITE_NAME}
+        </span>
+        <span class="text-[9px] sm:text-[10px] text-[var(--text-muted)] font-medium tracking-wide uppercase">
+          Инженерные расчёты
+        </span>
+      </div>
+    </a>
+
+    <!-- Desktop Nav -->
+    <nav class="hidden md:flex items-center gap-1" aria-label="Основная навигация">
+      {navLinks.map((link) => {
+        const isActive = currentPath === link.href || (link.href !== '/' && currentPath.startsWith(link.href));
+        return (
+          <a
+            href={link.href}
+            class:list={[
+              'px-3.5 py-2 rounded-lg text-sm font-medium transition-all min-h-[44px] inline-flex items-center',
+              isActive
+                ? 'text-[var(--accent)] bg-[var(--surface-hover)] border border-[var(--border)] shadow-sm font-semibold'
+                : 'text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-hover)]'
+            ]}
+          >
+            {link.label}
+          </a>
+        );
+      })}
+    </nav>
+
+    <!-- Mobile Menu Button -->
+    <div class="flex items-center md:hidden">
+      <button
+        id="mobile-menu-toggle"
+        type="button"
+        class="w-10 h-10 p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] inline-flex items-center justify-center"
+        aria-controls="mobile-menu"
+        aria-expanded="false"
+        aria-label="Открыть главное меню"
+      >
+        <svg id="burger-icon" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+        <svg id="close-icon" class="w-6 h-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Mobile Dropdown -->
+  <div id="mobile-menu" class="hidden md:hidden border-t border-[var(--border)] bg-[var(--surface)] backdrop-blur-xl px-4 pt-3 pb-5 space-y-1">
+    {navLinks.map((link) => {
+      const isActive = currentPath === link.href || (link.href !== '/' && currentPath.startsWith(link.href));
+      return (
+        <a
+          href={link.href}
+          class:list={[
+            'block px-4 py-3 rounded-xl text-base font-medium min-h-[44px] flex items-center transition-colors',
+            isActive
+              ? 'bg-[var(--surface-hover)] text-[var(--accent)] border border-[var(--border)] font-semibold'
+              : 'text-[var(--text)] hover:bg-[var(--surface-hover)]'
+          ]}
+        >
+          {link.label}
+        </a>
+      );
+    })}
+
+    <!-- Mobile Theme Switcher inside Burger Menu -->
+    <div class="pt-4 pb-2 border-t border-[var(--border)] mt-3" id="mobile-theme-section">
+      <div class="flex items-center justify-between mb-2.5 px-1">
+        <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+          Тема оформления
+        </span>
+        <span class="text-[11px] text-[var(--accent)] font-semibold" id="mobile-current-theme-name">
+          Неон-чертёж
+        </span>
+      </div>
+      <div class="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Темы оформления">
+        {presets.map((preset) => (
+          <button
+            type="button"
+            data-mobile-theme-id={preset.id}
+            class="mobile-theme-btn p-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--accent)] text-left flex items-center gap-2.5 transition-all min-h-[44px] cursor-pointer"
+          >
+            <div class="flex items-center -space-x-1 p-0.5 rounded bg-black/10 dark:bg-black/30 border border-[var(--border)] flex-shrink-0">
+              <span
+                class="w-2.5 h-2.5 rounded-full"
+                style={`background-color: ${preset.palette[0]}`}
+              />
+              <span
+                class="w-2.5 h-2.5 rounded-full"
+                style={`background-color: ${preset.palette[1]}`}
+              />
+            </div>
+            <span class="text-xs font-medium text-[var(--text)] truncate">
+              {preset.name}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+</header>
+
+<script>
+  // Clean client-side toggle without framework overhead
+  const btn = document.getElementById('mobile-menu-toggle');
+  const menu = document.getElementById('mobile-menu');
+  const burgerIcon = document.getElementById('burger-icon');
+  const closeIcon = document.getElementById('close-icon');
+
+  if (btn && menu && burgerIcon && closeIcon) {
+    btn.addEventListener('click', () => {
+      const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', String(!isExpanded));
+      menu.classList.toggle('hidden');
+      burgerIcon.classList.toggle('hidden');
+      closeIcon.classList.toggle('hidden');
+    });
+  }
+
+  // Mobile Theme Switcher logic
+  const mobileThemeBtns = document.querySelectorAll<HTMLButtonElement>('[data-mobile-theme-id]');
+  const mobileThemeLabel = document.getElementById('mobile-current-theme-name');
+
+  function syncMobileThemeUI(themeId: string) {
+    if (mobileThemeLabel) {
+      const matchingBtn = document.querySelector<HTMLButtonElement>(`[data-mobile-theme-id="${themeId}"]`);
+      if (matchingBtn) {
+        mobileThemeLabel.textContent = matchingBtn.querySelector('span.truncate')?.textContent || themeId;
+      }
+    }
+    mobileThemeBtns.forEach((b) => {
+      const isCurrent = b.getAttribute('data-mobile-theme-id') === themeId;
+      if (isCurrent) {
+        b.classList.add('border-[var(--accent)]', 'bg-[var(--accent)]/15');
+      } else {
+        b.classList.remove('border-[var(--accent)]', 'bg-[var(--accent)]/15');
+      }
+    });
+  }
+
+  const currentTheme = document.documentElement.getAttribute('data-theme') || 'neon';
+  syncMobileThemeUI(currentTheme);
+
+  mobileThemeBtns.forEach((b) => {
+    b.addEventListener('click', () => {
+      const themeId = b.getAttribute('data-mobile-theme-id');
+      if (!themeId) return;
+
+      document.documentElement.setAttribute('data-theme', themeId);
+      try {
+        localStorage.setItem('stroicalc_theme', themeId);
+      } catch {}
+
+      syncMobileThemeUI(themeId);
+      window.dispatchEvent(new CustomEvent('theme-change', { detail: { theme: themeId } }));
+    });
+  });
+
+  window.addEventListener('theme-change', (e: any) => {
+    if (e.detail?.theme) syncMobileThemeUI(e.detail.theme);
+  });
+</script>
