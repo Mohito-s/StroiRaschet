@@ -967,18 +967,21 @@ export class HouseOrb {
         this.windowGroups.push({
           paneIndices: [idx],
           baseEmissives: [windowEmissiveArray[idx]],
-          nextDimTime: 8.0 + seededRng() * 17.0, // 8–25s
-          dimDuration: 0.6 + seededRng() * 0.9,  // 0.6–1.5s
-          dimDepth: 0.30 + seededRng() * 0.20,   // 30–50%
+          nextDimTime: 2.0 + seededRng() * 5.0,  // 2–7s initial stagger
+          dimDuration: 0.7 + seededRng() * 0.9,  // 0.7–1.6s
+          dimDepth: 0.25 + seededRng() * 0.25,   // 25–50%
           isOffWindow: false,
-          nextOffTime: 18.0 + seededRng() * 22.0,
+          nextOffTime: 12.0 + seededRng() * 16.0,
           offDuration: 3.0 + seededRng() * 3.0   // 3–6s
         });
       }
     }
     if (this.windowGroups.length > 0) {
-      // Pick front-right window to occasionally turn off completely
+      // Pick front-right and attic/bedroom windows to occasionally turn off completely
       this.windowGroups[Math.min(1, this.windowGroups.length - 1)].isOffWindow = true;
+      if (this.windowGroups.length > 8) {
+        this.windowGroups[8].isOffWindow = true;
+      }
     }
 
     this.cubeMaterial = new THREE.MeshStandardMaterial({
@@ -990,6 +993,7 @@ export class HouseOrb {
     });
 
     this.cubeUniforms = {
+      uTime: { value: 0.0 },
       uHouseColor: { value: this.currentColor },
       uAccent2Color: { value: this.currentAccent2Color },
       uAccentColor: { value: this.currentAccentColor },
@@ -1016,6 +1020,7 @@ export class HouseOrb {
     this.cubeMaterial.customProgramCacheKey = () => 'house-bricks-pbr';
 
     this.cubeMaterial.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = this.cubeUniforms!.uTime;
       shader.uniforms.uHouseColor = this.cubeUniforms!.uHouseColor;
       shader.uniforms.uAccent2Color = this.cubeUniforms!.uAccent2Color;
       shader.uniforms.uAccentColor = this.cubeUniforms!.uAccentColor;
@@ -1101,6 +1106,7 @@ export class HouseOrb {
         uniform float uMortarWidth;
         uniform float uMortarGlow;
         uniform float uMaxLuma;
+        uniform float uTime;
 
         varying float vInstanceType;
         varying float vTint;
@@ -1169,8 +1175,15 @@ export class HouseOrb {
           // Window: luminous emissive with warm amber glow and brilliant white core
           float innerDist = max(abs(vWindowUv.x - 0.5), abs(vWindowUv.y - 0.5));
           float isCenter = 1.0 - smoothstep(0.24, 0.316, innerDist);
-          vec3 winColorEmissive = uWindowGlowColor * 0.90;
-          vec3 coreEmissive = vec3(1.0, 0.98, 0.92) * 1.35;
+
+          // Living fireplace & candle hearth micro-flicker (warm flame dynamics)
+          float flame1 = sin(uTime * 3.7 + vWorldY * 2.8 + vWindowUv.x * 4.0);
+          float flame2 = cos(uTime * 6.9 + vWorldY * 4.2 - vWindowUv.y * 5.0);
+          float flame3 = sin(uTime * 11.3 + vWindowUv.x * 8.0);
+          float hearthFlicker = 1.0 + 0.055 * flame1 + 0.035 * flame2 + 0.020 * flame3;
+
+          vec3 winColorEmissive = uWindowGlowColor * (0.92 * hearthFlicker);
+          vec3 coreEmissive = vec3(1.0, 0.98, 0.92) * (1.38 * hearthFlicker);
           vec3 winEmissive = mix(winColorEmissive, coreEmissive, isCenter);
           totalEmissiveRadiance = winEmissive * (min(1.5, vWindowEmissive) * (uEmissiveFade * uSceneBrightness * vAmbientAlpha));
         } else if (vInstanceType > 5.5) {
@@ -1578,7 +1591,8 @@ export class HouseOrb {
 
     this.windowSpotMaterial = new THREE.ShaderMaterial({
       uniforms: {
-        uFade: { value: 1.0 }
+        uFade: { value: 1.0 },
+        uTime: { value: 0.0 }
       },
       vertexShader: `
         varying vec2 vUv;
@@ -1589,14 +1603,16 @@ export class HouseOrb {
       `,
       fragmentShader: `
         uniform float uFade;
+        uniform float uTime;
         varying vec2 vUv;
         void main() {
           // vUv.y goes from 0.0 at wall to 1.0 outward (decaying smoothly to 0 at 2m)
           float distFalloff = pow(clamp(1.0 - vUv.y, 0.0, 1.0), 1.6);
           // vUv.x across width [0..1]
           float sideFalloff = sin(clamp(vUv.x, 0.0, 1.0) * 3.14159265);
-          // Opacity up to 0.18, smooth warm golden/amber glow
-          float intensity = distFalloff * sideFalloff * 0.18 * uFade;
+          // Breathing hearth light on grass/ground in sync with fireplace
+          float hearthBreath = 1.0 + 0.06 * sin(uTime * 3.7) + 0.04 * cos(uTime * 6.9);
+          float intensity = distFalloff * sideFalloff * 0.18 * uFade * hearthBreath;
           vec3 warmWindow = vec3(1.0, 0.72, 0.38);
           gl_FragColor = vec4(warmWindow * intensity, intensity);
         }
@@ -1726,31 +1742,37 @@ export class HouseOrb {
         uniform float uTime;
         uniform float uPixelRatio;
         varying float vAlpha;
+        varying float vProgress;
 
         void main() {
           float t = (uTime / aLifetime) + aProgressOffset;
           float p = fract(t);
+          vProgress = p;
 
-          // Rises 3m over 6-8s from chimney top (y = 6.47 to 9.47)
-          float y = 6.47 + p * 3.0;
+          // Chimney rim is at (2.0, 6.47, 1.0)
+          // Rises 3.5m over 6-8s from chimney top (y = 6.47 to 9.97)
+          float y = 6.47 + p * 3.5;
 
-          // Wind softly bends to the right (positive X)
-          float windX = p * 0.95 + sin(p * 5.0 + aSeed.x * 6.28) * 0.12 * p;
-          float windZ = cos(p * 4.0 + aSeed.y * 6.28) * 0.12 * p;
+          // Soft wind drift to the right + gentle curling turbulence
+          float curl1 = sin(p * 5.0 + aSeed.x * 6.28) * 0.25 * p;
+          float curl2 = cos(p * 4.0 + aSeed.y * 6.28) * 0.20 * p;
+          float windX = p * 1.35 + curl1;
+          float windZ = p * 0.35 + curl2;
 
           vec3 pos = vec3(2.0 + windX, y, 1.0 + windZ);
 
-          // Expands from 0.15m to 0.70m
-          float sizeMeters = mix(0.15, 0.70, p);
+          // Expands from 0.40m up to 2.10m (billowy, soft clouds of smoke)
+          float sizeMeters = mix(0.40, 2.10, pow(p, 0.7));
 
           vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-          gl_PointSize = (sizeMeters * 380.0 * uPixelRatio) / -mvPosition.z;
-          gl_PointSize = clamp(gl_PointSize, 3.0, 140.0);
+          // Perspective point size calibrated for fov=32: H / (2 * tan(fov/2)) ≈ 1550
+          gl_PointSize = (sizeMeters * 1550.0 * uPixelRatio) / -mvPosition.z;
+          gl_PointSize = clamp(gl_PointSize, 6.0, 260.0);
 
-          // Opacity 0.35 -> 0.0 with soft emergence at the rim
-          float birth = smoothstep(0.0, 0.07, p);
-          float fade = 1.0 - p;
-          vAlpha = 0.35 * birth * fade;
+          // Smooth birth at rim, billowy body, soft dispersal at top
+          float birth = smoothstep(0.0, 0.10, p);
+          float fade = pow(1.0 - p, 1.3);
+          vAlpha = 0.55 * birth * fade;
 
           gl_Position = projectionMatrix * mvPosition;
         }
@@ -1760,12 +1782,15 @@ export class HouseOrb {
         uniform sampler2D uTexture;
         uniform float uFade;
         varying float vAlpha;
+        varying float vProgress;
 
         void main() {
           vec4 tex = texture2D(uTexture, gl_PointCoord);
           float alpha = tex.a * vAlpha * uFade;
           if (alpha < 0.005) discard;
-          gl_FragColor = vec4(uColor, alpha);
+          // Slight warm-lit glow near chimney base from fire, soft cool smoke above
+          vec3 col = mix(uColor * 1.30 + vec3(0.12, 0.08, 0.04), uColor, smoothstep(0.0, 0.35, vProgress));
+          gl_FragColor = vec4(col, alpha);
         }
       `,
       transparent: true,
@@ -1865,6 +1890,7 @@ export class HouseOrb {
         uniform float uMortarWidth;
         uniform float uMortarGlow;
         uniform float uMaxLuma;
+        uniform float uTime;
 
         varying float vInstanceType;
         varying float vTint;
@@ -2478,6 +2504,12 @@ export class HouseOrb {
     if (this.smokeUniforms?.uTime) {
       this.smokeUniforms.uTime.value = time;
     }
+    if (this.cubeUniforms?.uTime) {
+      this.cubeUniforms.uTime.value = time;
+    }
+    if (this.windowSpotMaterial?.uniforms?.uTime) {
+      this.windowSpotMaterial.uniforms.uTime.value = time;
+    }
 
     if (this.transitionState === 'house_to_ambient') {
       this.transitionElapsed += dt;
@@ -2865,7 +2897,7 @@ export class HouseOrb {
         }
       }
 
-      // 2) Living windows: each window dims by 30-50% for 0.6-1.5s every 8-25s; one window occasionally shuts off for 3-6s
+      // 2) Living windows: natural indoor presence and dimming across rooms
       if (this.windowEmissiveArray && this.windowEmissiveAttr && this.windowGroups.length > 0) {
         let needsAttrUpdate = false;
         for (const group of this.windowGroups) {
@@ -2874,13 +2906,13 @@ export class HouseOrb {
           if (group.isOffWindow) {
             if (time >= group.nextOffTime && time < group.nextOffTime + group.offDuration) {
               const tOff = time - group.nextOffTime;
-              const fadeIn = Math.min(1.0, tOff / 0.4);
-              const fadeOut = Math.min(1.0, (group.offDuration - tOff) / 0.4);
+              const fadeIn = Math.min(1.0, tOff / 0.5);
+              const fadeOut = Math.min(1.0, (group.offDuration - tOff) / 0.5);
               mult = 1.0 - Math.max(0.0, Math.min(fadeIn, fadeOut));
               needsAttrUpdate = true;
             } else if (time >= group.nextOffTime + group.offDuration) {
-              group.nextOffTime = time + 20.0 + Math.random() * 25.0;
-              group.offDuration = 3.0 + Math.random() * 3.0; // 3–6s
+              group.nextOffTime = time + 10.0 + Math.random() * 14.0; // 10–24s
+              group.offDuration = 3.0 + Math.random() * 3.0;          // 3–6s
             }
           }
 
@@ -2891,15 +2923,19 @@ export class HouseOrb {
               mult = 1.0 - group.dimDepth * curve;
               needsAttrUpdate = true;
             } else if (time >= group.nextDimTime + group.dimDuration) {
-              group.nextDimTime = time + 8.0 + Math.random() * 17.0; // 8–25s
-              group.dimDuration = 0.6 + Math.random() * 0.9;         // 0.6–1.5s
-              group.dimDepth = 0.30 + Math.random() * 0.20;          // 30–50%
+              group.nextDimTime = time + 3.0 + Math.random() * 6.5; // 3–9.5s lively pace
+              group.dimDuration = 0.7 + Math.random() * 1.0;        // 0.7–1.7s
+              group.dimDepth = 0.25 + Math.random() * 0.25;         // 25–50%
             }
           }
 
           for (let j = 0; j < group.paneIndices.length; j++) {
             const pIdx = group.paneIndices[j];
-            this.windowEmissiveArray[pIdx] = group.baseEmissives[j] * mult;
+            const targetVal = group.baseEmissives[j] * mult;
+            if (Math.abs(this.windowEmissiveArray[pIdx] - targetVal) > 0.001) {
+              this.windowEmissiveArray[pIdx] = targetVal;
+              needsAttrUpdate = true;
+            }
           }
         }
         if (needsAttrUpdate) {
