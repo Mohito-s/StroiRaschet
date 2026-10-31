@@ -5,7 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { getThemeSceneConfig, type ThemeScene3DConfig } from '../config/theme';
+import { getThemeSceneConfig, getThemeHouseConfig, type ThemeScene3DConfig, type ThemeHouseConfig } from '../config/theme';
 
 export interface HouseItem {
   p: [number, number, number];
@@ -28,6 +28,20 @@ function segs(len: number, brick: number, odd: number | boolean): [number, numbe
   while (pos + brick <= len + 1e-6) { out.push([pos, pos + brick]); pos += brick; }
   if (pos < len - 1e-6) out.push([pos, len]);
   return out;
+}
+
+/**
+ * Детерминированный генератор псевдослучайных чисел (Mulberry32)
+ * Гарантирует абсолютно одинаковые оттенки кирпичей и светимость окон при каждом запуске.
+ */
+function createSeededRandom(seed = 12345) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 export function buildHouse(): HouseItem[] {
@@ -429,6 +443,50 @@ export class HouseOrb {
   private lastFrameTime = 0;
   private timelineTime = 0;
 
+  // House materials & profile config (wall, roof, mortar, trim, windowGlow)
+  private currentThemeId: string = 'neon';
+  private houseConfig: ThemeHouseConfig;
+  private currentWallColor: THREE.Color;
+  private targetWallColor: THREE.Color;
+  private currentRoofColor: THREE.Color;
+  private targetRoofColor: THREE.Color;
+  private currentMortarColor: THREE.Color;
+  private targetMortarColor: THREE.Color;
+  private currentTrimColor: THREE.Color;
+  private targetTrimColor: THREE.Color;
+  private currentWindowGlowColor: THREE.Color;
+  private targetWindowGlowColor: THREE.Color;
+
+  // Alive House Elements:
+  // 1) Chimney smoke (36 particles)
+  private smokeMesh?: THREE.Points;
+  private smokeUniforms?: Record<string, { value: any }>;
+  private currentSmokeColor: THREE.Color;
+  private targetSmokeColor: THREE.Color;
+
+  // 2) Contact shadow under house base (radial dark gradient)
+  private contactShadowMesh?: THREE.Mesh;
+  private contactShadowUniforms?: Record<string, { value: any }>;
+
+  // 3) Ground reflection (desktop only)
+  private reflectedGroup?: THREE.Group;
+  private reflectedMesh?: THREE.InstancedMesh;
+  private reflectedMaterial?: THREE.MeshStandardMaterial;
+
+  // 4) Dynamic window flickering state
+  private windowGroups: {
+    paneIndices: number[];
+    baseEmissives: number[];
+    nextDimTime: number;
+    dimDuration: number;
+    dimDepth: number;
+    isOffWindow: boolean;
+    nextOffTime: number;
+    offDuration: number;
+  }[] = [];
+  private windowEmissiveAttr?: THREE.InstancedBufferAttribute;
+  private windowEmissiveArray?: Float32Array;
+
   // Color transition state (0.4s smooth lerp)
   private currentColor: THREE.Color;
   private targetColor: THREE.Color;
@@ -454,9 +512,11 @@ export class HouseOrb {
   constructor(options: HouseOrbOptions) {
     this.container = options.container;
 
-    // Read initial theme and scene configuration
+    // Read initial theme, scene, and house profile configuration
     const initialThemeId = typeof document !== 'undefined' ? (document.documentElement.getAttribute('data-theme') || 'neon') : 'neon';
+    this.currentThemeId = initialThemeId;
     this.themeConfig = getThemeSceneConfig(initialThemeId);
+    this.houseConfig = getThemeHouseConfig(initialThemeId);
 
     // Camera parameters from theme config
     const camCfg = this.themeConfig.camera || { fov: 32, elevation: 24, azimuth: 32, lookAtY: 0 };
@@ -465,8 +525,8 @@ export class HouseOrb {
     this.cameraAzimuth = camCfg.azimuth;
     this.cameraLookAtY = camCfg.lookAtY;
 
-    // Read colors from CSS custom properties on document
-    const cssHouseColor = initialThemeId === 'light' ? '#2c5282' : (this.readCssVariable('--house-color') || '#00f0ff');
+    // Read colors from CSS custom properties or theme configuration (no hardcoded colors)
+    const cssHouseColor = this.readCssVariable('--house-color') || this.houseConfig.wall;
     const cssAccent2 = this.readCssVariable('--accent-2') || '#10b981';
     const cssBgColor = this.themeConfig.bg;
     const cssAccent = this.readCssVariable('--accent') || '#06b6d4';
@@ -475,6 +535,25 @@ export class HouseOrb {
     // Parse colors: separate RGB and alpha; THREE.Color strictly receives RGB
     this.currentColor = this.parseRgbOnly(cssHouseColor);
     this.targetColor = this.currentColor.clone();
+
+    // Specific house profile colors
+    this.currentWallColor = new THREE.Color(this.houseConfig.wall);
+    this.targetWallColor = this.currentWallColor.clone();
+
+    this.currentRoofColor = new THREE.Color(this.houseConfig.roof);
+    this.targetRoofColor = this.currentRoofColor.clone();
+
+    this.currentMortarColor = new THREE.Color(this.houseConfig.mortar);
+    this.targetMortarColor = this.currentMortarColor.clone();
+
+    this.currentTrimColor = new THREE.Color(this.houseConfig.trim);
+    this.targetTrimColor = this.currentTrimColor.clone();
+
+    this.currentWindowGlowColor = new THREE.Color(this.houseConfig.windowGlow);
+    this.targetWindowGlowColor = this.currentWindowGlowColor.clone();
+
+    this.currentSmokeColor = new THREE.Color(this.houseConfig.smoke || '#94a3b8');
+    this.targetSmokeColor = this.currentSmokeColor.clone();
 
     this.currentAccent2Color = this.parseRgbOnly(cssAccent2);
     this.targetAccent2Color = this.currentAccent2Color.clone();
@@ -651,6 +730,12 @@ export class HouseOrb {
     this.softCircleTexture = createSoftCircleTexture(64);
     this.bokehTexture = createBokehTexture(128);
 
+    // Contact shadow under house base (radial gradient)
+    this.buildContactShadow();
+
+    // Chimney smoke particles (36 sprites)
+    this.buildChimneySmoke();
+
     // Build background layers
     this.buildDistantStars(isNarrow);
     this.buildMidDust(isNarrow);
@@ -799,6 +884,7 @@ export class HouseOrb {
     const typeArray = new Float32Array(count);
     const tintArray = new Float32Array(count);
     const windowEmissiveArray = new Float32Array(count);
+    const seededRng = createSeededRandom(12345);
 
     for (let i = 0; i < count; i++) {
       const item = this.items[i];
@@ -809,15 +895,15 @@ export class HouseOrb {
       switch (item.type) {
         case 'wall':
           typeId = 0.0;
-          tint = 1.0 + (Math.random() * 0.24 - 0.12);
+          tint = 1.0 + (seededRng() * 0.24 - 0.12);
           break;
         case 'base':
           typeId = 1.0;
-          tint = 1.0 + (Math.random() * 0.24 - 0.12);
+          tint = 1.0 + (seededRng() * 0.24 - 0.12);
           break;
         case 'roof':
           typeId = 2.0;
-          tint = 1.0 + (Math.random() * 0.24 - 0.12);
+          tint = 1.0 + (seededRng() * 0.24 - 0.12);
           break;
         case 'trim':
           typeId = 3.0;
@@ -830,8 +916,8 @@ export class HouseOrb {
         case 'window':
           typeId = 5.0;
           tint = 1.0;
-          // Random intensity between 0.6 and 1.0 so house looks alive
-          emissive = 0.45 + Math.random() * 0.25;
+          // Luminous warm windows
+          emissive = 0.85 + seededRng() * 0.15;
           break;
         case 'chimney_rim':
           typeId = 6.0;
@@ -844,12 +930,56 @@ export class HouseOrb {
       windowEmissiveArray[i] = emissive;
     }
 
+    this.windowEmissiveArray = windowEmissiveArray;
+    this.windowEmissiveAttr = new THREE.InstancedBufferAttribute(windowEmissiveArray, 1);
+
     brickGeo.setAttribute('instanceType', new THREE.InstancedBufferAttribute(typeArray, 1));
     brickGeo.setAttribute('aTint', new THREE.InstancedBufferAttribute(tintArray, 1));
-    brickGeo.setAttribute('aWindowEmissive', new THREE.InstancedBufferAttribute(windowEmissiveArray, 1));
+    brickGeo.setAttribute('aWindowEmissive', this.windowEmissiveAttr);
     const ambientAlphaArray = new Float32Array(count);
     ambientAlphaArray.fill(1.0);
     brickGeo.setAttribute('aAmbientAlpha', new THREE.InstancedBufferAttribute(ambientAlphaArray, 1));
+
+    // Group window panes into spatial units for living flicker/dimming animation
+    const windowPaneIndices: number[] = [];
+    for (let i = 0; i < count; i++) {
+      if (this.items[i].type === 'window') {
+        windowPaneIndices.push(i);
+      }
+    }
+    this.windowGroups = [];
+    for (const idx of windowPaneIndices) {
+      const p = this.items[idx].p;
+      let found = false;
+      for (const group of this.windowGroups) {
+        const leaderPos = this.items[group.paneIndices[0]].p;
+        const dx = p[0] - leaderPos[0];
+        const dy = p[1] - leaderPos[1];
+        const dz = p[2] - leaderPos[2];
+        if (dx * dx + dy * dy + dz * dz < 1.4 * 1.4) {
+          group.paneIndices.push(idx);
+          group.baseEmissives.push(windowEmissiveArray[idx]);
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        this.windowGroups.push({
+          paneIndices: [idx],
+          baseEmissives: [windowEmissiveArray[idx]],
+          nextDimTime: 8.0 + seededRng() * 17.0, // 8–25s
+          dimDuration: 0.6 + seededRng() * 0.9,  // 0.6–1.5s
+          dimDepth: 0.30 + seededRng() * 0.20,   // 30–50%
+          isOffWindow: false,
+          nextOffTime: 18.0 + seededRng() * 22.0,
+          offDuration: 3.0 + seededRng() * 3.0   // 3–6s
+        });
+      }
+    }
+    if (this.windowGroups.length > 0) {
+      // Pick front-right window to occasionally turn off completely
+      this.windowGroups[Math.min(1, this.windowGroups.length - 1)].isOffWindow = true;
+    }
 
     this.cubeMaterial = new THREE.MeshStandardMaterial({
       color: 0xffffff,
@@ -863,8 +993,24 @@ export class HouseOrb {
       uHouseColor: { value: this.currentColor },
       uAccent2Color: { value: this.currentAccent2Color },
       uAccentColor: { value: this.currentAccentColor },
+      uGlowColor: { value: this.currentGlowColor },
       uEmissiveFade: { value: 1.0 },
-      uSceneBrightness: { value: 1.0 }
+      uSceneBrightness: { value: 1.0 },
+
+      uWallColor: { value: this.currentWallColor },
+      uRoofColor: { value: this.currentRoofColor },
+      uMortarColor: { value: this.currentMortarColor },
+      uTrimColor: { value: this.currentTrimColor },
+      uWindowGlowColor: { value: this.currentWindowGlowColor },
+
+      uWallGain: { value: this.houseConfig.wallGain },
+      uRoofGain: { value: this.houseConfig.roofGain },
+      uBaseGain: { value: this.houseConfig.baseGain },
+      uTrimGain: { value: this.houseConfig.trimGain },
+      uMortarDarkness: { value: this.houseConfig.mortarDarkness },
+      uMortarWidth: { value: this.houseConfig.mortarWidth },
+      uMortarGlow: { value: this.houseConfig.mortarGlow },
+      uMaxLuma: { value: this.houseConfig.maxLuma }
     };
 
     this.cubeMaterial.customProgramCacheKey = () => 'house-bricks-pbr';
@@ -873,8 +1019,24 @@ export class HouseOrb {
       shader.uniforms.uHouseColor = this.cubeUniforms!.uHouseColor;
       shader.uniforms.uAccent2Color = this.cubeUniforms!.uAccent2Color;
       shader.uniforms.uAccentColor = this.cubeUniforms!.uAccentColor;
+      shader.uniforms.uGlowColor = this.cubeUniforms!.uGlowColor;
       shader.uniforms.uEmissiveFade = this.cubeUniforms!.uEmissiveFade;
       shader.uniforms.uSceneBrightness = this.cubeUniforms!.uSceneBrightness;
+
+      shader.uniforms.uWallColor = this.cubeUniforms!.uWallColor;
+      shader.uniforms.uRoofColor = this.cubeUniforms!.uRoofColor;
+      shader.uniforms.uMortarColor = this.cubeUniforms!.uMortarColor;
+      shader.uniforms.uTrimColor = this.cubeUniforms!.uTrimColor;
+      shader.uniforms.uWindowGlowColor = this.cubeUniforms!.uWindowGlowColor;
+
+      shader.uniforms.uWallGain = this.cubeUniforms!.uWallGain;
+      shader.uniforms.uRoofGain = this.cubeUniforms!.uRoofGain;
+      shader.uniforms.uBaseGain = this.cubeUniforms!.uBaseGain;
+      shader.uniforms.uTrimGain = this.cubeUniforms!.uTrimGain;
+      shader.uniforms.uMortarDarkness = this.cubeUniforms!.uMortarDarkness;
+      shader.uniforms.uMortarWidth = this.cubeUniforms!.uMortarWidth;
+      shader.uniforms.uMortarGlow = this.cubeUniforms!.uMortarGlow;
+      shader.uniforms.uMaxLuma = this.cubeUniforms!.uMaxLuma;
 
       shader.vertexShader = `
         attribute float instanceType;
@@ -889,6 +1051,8 @@ export class HouseOrb {
         varying vec2 vWindowUv;
         varying vec3 vLocalPos;
         varying vec3 vLocalNormal;
+        varying vec3 vInstanceScale;
+        varying float vWorldY;
         ${shader.vertexShader}
       `.replace(
         '#include <begin_vertex>',
@@ -901,6 +1065,17 @@ export class HouseOrb {
         vWindowUv = uv;
         vLocalPos = position;
         vLocalNormal = normal;
+        #ifdef USE_INSTANCING
+          vInstanceScale = vec3(
+            length(instanceMatrix[0].xyz),
+            length(instanceMatrix[1].xyz),
+            length(instanceMatrix[2].xyz)
+          );
+          vWorldY = (instanceMatrix * vec4(position, 1.0)).y;
+        #else
+          vInstanceScale = vec3(1.0);
+          vWorldY = position.y;
+        #endif
         `
       );
 
@@ -908,8 +1083,24 @@ export class HouseOrb {
         uniform vec3 uHouseColor;
         uniform vec3 uAccent2Color;
         uniform vec3 uAccentColor;
+        uniform vec3 uGlowColor;
         uniform float uEmissiveFade;
         uniform float uSceneBrightness;
+
+        uniform vec3 uWallColor;
+        uniform vec3 uRoofColor;
+        uniform vec3 uMortarColor;
+        uniform vec3 uTrimColor;
+        uniform vec3 uWindowGlowColor;
+
+        uniform float uWallGain;
+        uniform float uRoofGain;
+        uniform float uBaseGain;
+        uniform float uTrimGain;
+        uniform float uMortarDarkness;
+        uniform float uMortarWidth;
+        uniform float uMortarGlow;
+        uniform float uMaxLuma;
 
         varying float vInstanceType;
         varying float vTint;
@@ -918,46 +1109,56 @@ export class HouseOrb {
         varying vec2 vWindowUv;
         varying vec3 vLocalPos;
         varying vec3 vLocalNormal;
+        varying vec3 vInstanceScale;
+        varying float vWorldY;
         ${shader.fragmentShader}
       `.replace(
         '#include <color_fragment>',
         `
         #include <color_fragment>
-        vec3 dEdge = vec3(0.5) - abs(vLocalPos);
+        vec3 dEdgeMeters = max(vec3(0.0), (vec3(0.5) - abs(vLocalPos)) * vInstanceScale);
         vec3 absNorm = abs(vLocalNormal);
-        float distToEdge = (absNorm.x > 0.5) ? min(dEdge.y, dEdge.z) : ((absNorm.y > 0.5) ? min(dEdge.x, dEdge.z) : min(dEdge.x, dEdge.y));
-        float mortarFactor = smoothstep(0.015, 0.085, distToEdge);
-        float topBevel = (1.0 - mortarFactor) * max(0.0, vLocalNormal.y) * 0.35;
+        float distToEdgeMeters = (absNorm.x > 0.5) ? min(dEdgeMeters.y, dEdgeMeters.z) : ((absNorm.y > 0.5) ? min(dEdgeMeters.x, dEdgeMeters.z) : min(dEdgeMeters.x, dEdgeMeters.y));
+        float mortarFactor = smoothstep(0.0, uMortarWidth, distToEdgeMeters);
+        float topBevel = (1.0 - mortarFactor) * max(0.0, vLocalNormal.y) * 0.70;
 
         if (vInstanceType < 0.5) {
-          // Masonry brickwork (wall): individual brick tint + distinct mortar joints + top-bevel highlight
-          vec3 baseBrick = (uHouseColor * 0.12) * (0.80 + 0.38 * vTint);
-          diffuseColor.rgb = baseBrick * mix(0.35, 1.0, mortarFactor) + (uHouseColor * topBevel * 0.20);
+          // Masonry brickwork (wall): individual brick tint + distinct mortar joints + enhanced top-bevel highlight
+          vec3 baseBrick = (uWallColor * uWallGain) * (0.80 + 0.38 * vTint);
+          vec3 mortarBase = mix(baseBrick * uMortarDarkness, uMortarColor * uWallGain * uMortarDarkness, 0.6);
+          diffuseColor.rgb = mix(mortarBase, baseBrick, mortarFactor) + (uWallColor * topBevel * 0.20);
         } else if (vInstanceType < 1.5) {
-          // Floor slab (base): 40% quieter
-          vec3 baseSlab = (uHouseColor * 0.07) * (0.85 + 0.30 * vTint);
-          diffuseColor.rgb = baseSlab * mix(0.40, 1.0, mortarFactor);
+          // Floor slab (base): foundation
+          vec3 baseSlab = (uWallColor * uBaseGain) * (0.85 + 0.30 * vTint);
+          diffuseColor.rgb = mix(baseSlab * uMortarDarkness, baseSlab, mortarFactor);
         } else if (vInstanceType < 2.5) {
-          // Roof tiles: not darker than wall by more than 15%
-          vec3 baseRoof = (uHouseColor * 0.105) * (0.82 + 0.36 * vTint);
-          diffuseColor.rgb = baseRoof * mix(0.38, 1.0, mortarFactor) + (uHouseColor * topBevel * 0.18);
+          // Roof tiles: tile tint + mortar/overlap + top-bevel highlight
+          vec3 baseRoof = (uRoofColor * uRoofGain) * (0.82 + 0.36 * vTint);
+          diffuseColor.rgb = mix(baseRoof * uMortarDarkness, baseRoof, mortarFactor) + (uRoofColor * topBevel * 0.20);
         } else if (vInstanceType < 3.5) {
-          // trim: slightly lighter than wall
-          diffuseColor.rgb = min(vec3(1.0), uHouseColor * 0.18);
+          // Trim: architectural trim/frames
+          diffuseColor.rgb = uTrimColor * uTrimGain;
         } else if (vInstanceType < 4.5) {
-          // door: dark rich wood
+          // Door: dark rich wood
           diffuseColor.rgb = vec3(0.10, 0.06, 0.03);
         } else if (vInstanceType < 5.5) {
-          // window: warm amber glass with bright white core in central 40% area
+          // Window: luminous warm glass with bright white core in central 40% area
           float innerDist = max(abs(vWindowUv.x - 0.5), abs(vWindowUv.y - 0.5));
           float isCenter = 1.0 - smoothstep(0.24, 0.316, innerDist);
-          vec3 amberGlass = vec3(0.40, 0.25, 0.10);
-          vec3 whiteCore = vec3(0.98, 0.97, 0.94);
+          vec3 amberGlass = uWindowGlowColor * 0.75;
+          vec3 whiteCore = vec3(1.0, 0.98, 0.94);
           diffuseColor.rgb = mix(amberGlass, whiteCore, isCenter);
         } else {
-          // chimney_rim: glowing accent rim
+          // Chimney rim: glowing accent rim
           diffuseColor.rgb = uAccentColor * 0.35;
         }
+
+        // Dampness for bottom 2 rows (y in [0, 0.55m]): darkened by 15% (same hue, darker)
+        if (vInstanceType < 1.5) {
+          float wetness = clamp(1.0 - (vWorldY / 0.55), 0.0, 1.0);
+          diffuseColor.rgb *= (1.0 - 0.15 * wetness);
+        }
+
         diffuseColor.rgb *= (uSceneBrightness * vAmbientAlpha);
         `
       ).replace(
@@ -965,56 +1166,31 @@ export class HouseOrb {
         `
         #include <emissivemap_fragment>
         if (vInstanceType > 4.5 && vInstanceType < 5.5) {
-          // Window: emissive strictly <= 1.0, central 40% pure core
+          // Window: luminous emissive with warm amber glow and brilliant white core
           float innerDist = max(abs(vWindowUv.x - 0.5), abs(vWindowUv.y - 0.5));
           float isCenter = 1.0 - smoothstep(0.24, 0.316, innerDist);
-          vec3 amberEmissive = vec3(0.85, 0.50, 0.16) * 0.35;
-          vec3 coreEmissive = vec3(1.0, 0.96, 0.90) * 1.0;
-          vec3 winEmissive = mix(amberEmissive, coreEmissive, isCenter);
-          totalEmissiveRadiance = winEmissive * (min(1.0, vWindowEmissive) * (uEmissiveFade * uSceneBrightness * vAmbientAlpha));
+          vec3 winColorEmissive = uWindowGlowColor * 0.90;
+          vec3 coreEmissive = vec3(1.0, 0.98, 0.92) * 1.35;
+          vec3 winEmissive = mix(winColorEmissive, coreEmissive, isCenter);
+          totalEmissiveRadiance = winEmissive * (min(1.5, vWindowEmissive) * (uEmissiveFade * uSceneBrightness * vAmbientAlpha));
         } else if (vInstanceType > 5.5) {
           // Chimney rim: subtle accent glow
           totalEmissiveRadiance = uAccentColor * (0.65 * uEmissiveFade * uSceneBrightness * vAmbientAlpha);
+        } else if (vInstanceType < 2.5) {
+          // Mortar inner glow for walls and roof in dark themes (light leaking from inside)
+          float seamGlow = (1.0 - mortarFactor) * uMortarGlow;
+          totalEmissiveRadiance = uGlowColor * (seamGlow * uEmissiveFade * uSceneBrightness * vAmbientAlpha);
         }
         `
       ).replace(
         '#include <dithering_fragment>',
         `
         #include <dithering_fragment>
-        // Exact photometric brightness guarantees (clamped in linear space to guarantee sRGB limits):
-        // sRGB max channel = (ACES(linear * 0.85))^(1/2.4):
-        // linear 0.14 -> sRGB <= 0.54
-        // linear 0.084 -> floor slab 40% quieter
-        // linear 0.12 -> roof <= 15% darker than wall
-        if (vInstanceType < 0.5) {
-          // Masonry brickwork (wall): strictly sRGB <= 0.54
+        // Anti-burnout ceiling protection from theme house profile (maxLuma >= 0.45 in dark themes)
+        if (vInstanceType < 4.5) {
           float maxC = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
-          if (maxC > 0.14) {
-            gl_FragColor.rgb *= (0.14 / maxC);
-          }
-        } else if (vInstanceType < 1.5) {
-          // Floor slab (base): 40% quieter
-          float maxC = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
-          if (maxC > 0.084) {
-            gl_FragColor.rgb *= (0.084 / maxC);
-          }
-        } else if (vInstanceType < 2.5) {
-          // Roof tiles: not darker than wall by more than 15%
-          float maxC = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
-          if (maxC > 0.12) {
-            gl_FragColor.rgb *= (0.12 / maxC);
-          }
-        } else if (vInstanceType < 4.5) {
-          // Trim & door: strictly sRGB <= 0.48
-          float maxC = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
-          if (maxC > 0.11) {
-            gl_FragColor.rgb *= (0.11 / maxC);
-          }
-        } else if (vInstanceType > 5.5) {
-          // Chimney rim: subtle accent glow
-          float maxC = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
-          if (maxC > 0.25) {
-            gl_FragColor.rgb *= (0.25 / maxC);
+          if (maxC > uMaxLuma) {
+            gl_FragColor.rgb *= (uMaxLuma / maxC);
           }
         }
         `
@@ -1022,7 +1198,11 @@ export class HouseOrb {
         '#include <roughnessmap_fragment>',
         `
         #include <roughnessmap_fragment>
-        if (vInstanceType > 3.5 && vInstanceType < 4.5) {
+        if (vInstanceType < 1.5) {
+          // Moist sheen on lower 2 rows
+          float wetness = clamp(1.0 - (vWorldY / 0.55), 0.0, 1.0);
+          roughnessFactor = mix(roughnessFactor, 0.42, wetness * 0.65);
+        } else if (vInstanceType > 3.5 && vInstanceType < 4.5) {
           // Door wood texture roughness
           roughnessFactor = 0.85;
         } else if (vInstanceType > 4.5) {
@@ -1156,6 +1336,12 @@ export class HouseOrb {
 
     this.instancedCubes.instanceMatrix.needsUpdate = true;
     this.stage.add(this.instancedCubes);
+
+    // 5) Ground reflection: weak mirror copy of house along Y axis (desktop only)
+    const isNarrow = typeof window !== 'undefined' ? window.innerWidth < 900 : false;
+    if (!this.isWeakDevice && !isNarrow) {
+      this.buildGroundReflection(brickGeo, count);
+    }
   }
 
   /**
@@ -1452,6 +1638,303 @@ export class HouseOrb {
       }
       this.stage.add(mesh);
     }
+  }
+
+  /**
+   * 3) Contact shadow: blurred dark spot under house base (radial gradient, opacity 0.5)
+   */
+  private buildContactShadow(): void {
+    const shadowGeo = new THREE.PlaneGeometry(8.6, 6.6);
+    this.contactShadowUniforms = {
+      uFade: { value: 1.0 }
+    };
+    const shadowMat = new THREE.ShaderMaterial({
+      uniforms: this.contactShadowUniforms,
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uFade;
+        varying vec2 vUv;
+        void main() {
+          vec2 p = (vUv - vec2(0.5)) * 2.0;
+          // Elliptical radial gradient matching house footprint (W=7, D=5)
+          float d = length(vec2(p.x * 0.88, p.y * 1.15));
+          float shadow = 1.0 - smoothstep(0.18, 0.98, d);
+          float alpha = shadow * 0.50 * uFade;
+          if (alpha < 0.005) discard;
+          gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      fog: false
+    });
+    this.contactShadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+    this.contactShadowMesh.rotation.x = -Math.PI / 2;
+    this.contactShadowMesh.position.set(0, -0.045, 0);
+    this.stage.add(this.contactShadowMesh);
+  }
+
+  /**
+   * 1) Chimney smoke: 36 sprite particles rising 3m over 6-8s, expanding 0.15 -> 0.70m,
+   * gentle wind drifting right, opacity 0.35 -> 0, soft grey-blue color from theme, normal blending.
+   */
+  private buildChimneySmoke(): void {
+    const smokeCount = 36;
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(smokeCount * 3);
+    const progOffsets = new Float32Array(smokeCount);
+    const lifetimes = new Float32Array(smokeCount);
+    const seeds = new Float32Array(smokeCount * 2);
+
+    const smokeRng = createSeededRandom(999);
+    for (let i = 0; i < smokeCount; i++) {
+      // Chimney rim is at (2.0, 6.47, 1.0)
+      pos[i * 3] = 2.0;
+      pos[i * 3 + 1] = 6.47;
+      pos[i * 3 + 2] = 1.0;
+      progOffsets[i] = i / smokeCount;
+      lifetimes[i] = 6.0 + smokeRng() * 2.0; // 6 - 8s
+      seeds[i * 2] = smokeRng();
+      seeds[i * 2 + 1] = smokeRng();
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('aProgressOffset', new THREE.BufferAttribute(progOffsets, 1));
+    geo.setAttribute('aLifetime', new THREE.BufferAttribute(lifetimes, 1));
+    geo.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 2));
+
+    this.smokeUniforms = {
+      uTime: { value: 0.0 },
+      uColor: { value: this.currentSmokeColor },
+      uTexture: { value: this.softCircleTexture },
+      uFade: { value: 1.0 },
+      uPixelRatio: { value: Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 2.0) }
+    };
+
+    const mat = new THREE.ShaderMaterial({
+      uniforms: this.smokeUniforms,
+      vertexShader: `
+        attribute float aProgressOffset;
+        attribute float aLifetime;
+        attribute vec2 aSeed;
+        uniform float uTime;
+        uniform float uPixelRatio;
+        varying float vAlpha;
+
+        void main() {
+          float t = (uTime / aLifetime) + aProgressOffset;
+          float p = fract(t);
+
+          // Rises 3m over 6-8s from chimney top (y = 6.47 to 9.47)
+          float y = 6.47 + p * 3.0;
+
+          // Wind softly bends to the right (positive X)
+          float windX = p * 0.95 + sin(p * 5.0 + aSeed.x * 6.28) * 0.12 * p;
+          float windZ = cos(p * 4.0 + aSeed.y * 6.28) * 0.12 * p;
+
+          vec3 pos = vec3(2.0 + windX, y, 1.0 + windZ);
+
+          // Expands from 0.15m to 0.70m
+          float sizeMeters = mix(0.15, 0.70, p);
+
+          vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+          gl_PointSize = (sizeMeters * 380.0 * uPixelRatio) / -mvPosition.z;
+          gl_PointSize = clamp(gl_PointSize, 3.0, 140.0);
+
+          // Opacity 0.35 -> 0.0 with soft emergence at the rim
+          float birth = smoothstep(0.0, 0.07, p);
+          float fade = 1.0 - p;
+          vAlpha = 0.35 * birth * fade;
+
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uColor;
+        uniform sampler2D uTexture;
+        uniform float uFade;
+        varying float vAlpha;
+
+        void main() {
+          vec4 tex = texture2D(uTexture, gl_PointCoord);
+          float alpha = tex.a * vAlpha * uFade;
+          if (alpha < 0.005) discard;
+          gl_FragColor = vec4(uColor, alpha);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.NormalBlending,
+      fog: false
+    });
+
+    this.smokeMesh = new THREE.Points(geo, mat);
+    this.smokeMesh.frustumCulled = false;
+    this.stage.add(this.smokeMesh);
+  }
+
+  /**
+   * 5) Ground reflection: weak mirror copy of house along Y axis with opacity 0.12, fading out over 2m,
+   * desktop only, without star reflections.
+   */
+  private buildGroundReflection(brickGeo: THREE.BufferGeometry, count: number): void {
+    this.reflectedMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.90,
+      metalness: 0.0,
+      envMapIntensity: 0.05,
+      fog: false,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+
+    this.reflectedMaterial.customProgramCacheKey = () => 'house-bricks-reflection';
+
+    this.reflectedMaterial.onBeforeCompile = (shader) => {
+      for (const k in this.cubeUniforms) {
+        shader.uniforms[k] = this.cubeUniforms[k];
+      }
+
+      shader.vertexShader = `
+        attribute float instanceType;
+        attribute float aTint;
+        attribute float aWindowEmissive;
+        attribute float aAmbientAlpha;
+
+        varying float vInstanceType;
+        varying float vTint;
+        varying float vWindowEmissive;
+        varying float vAmbientAlpha;
+        varying vec2 vWindowUv;
+        varying vec3 vLocalPos;
+        varying vec3 vLocalNormal;
+        varying vec3 vInstanceScale;
+        varying float vWorldY;
+        ${shader.vertexShader}
+      `.replace(
+        '#include <begin_vertex>',
+        `
+        #include <begin_vertex>
+        vInstanceType = instanceType;
+        vTint = aTint;
+        vWindowEmissive = aWindowEmissive;
+        vAmbientAlpha = aAmbientAlpha;
+        vWindowUv = uv;
+        vLocalPos = position;
+        vLocalNormal = normal;
+        #ifdef USE_INSTANCING
+          vInstanceScale = vec3(
+            length(instanceMatrix[0].xyz),
+            length(instanceMatrix[1].xyz),
+            length(instanceMatrix[2].xyz)
+          );
+          vWorldY = (instanceMatrix * vec4(position, 1.0)).y;
+        #else
+          vInstanceScale = vec3(1.0);
+          vWorldY = position.y;
+        #endif
+        `
+      );
+
+      shader.fragmentShader = `
+        uniform vec3 uHouseColor;
+        uniform vec3 uAccent2Color;
+        uniform vec3 uAccentColor;
+        uniform vec3 uGlowColor;
+        uniform float uEmissiveFade;
+        uniform float uSceneBrightness;
+
+        uniform vec3 uWallColor;
+        uniform vec3 uRoofColor;
+        uniform vec3 uMortarColor;
+        uniform vec3 uTrimColor;
+        uniform vec3 uWindowGlowColor;
+
+        uniform float uWallGain;
+        uniform float uRoofGain;
+        uniform float uBaseGain;
+        uniform float uTrimGain;
+        uniform float uMortarDarkness;
+        uniform float uMortarWidth;
+        uniform float uMortarGlow;
+        uniform float uMaxLuma;
+
+        varying float vInstanceType;
+        varying float vTint;
+        varying float vWindowEmissive;
+        varying float vAmbientAlpha;
+        varying vec2 vWindowUv;
+        varying vec3 vLocalPos;
+        varying vec3 vLocalNormal;
+        varying vec3 vInstanceScale;
+        varying float vWorldY;
+        ${shader.fragmentShader}
+      `.replace(
+        '#include <color_fragment>',
+        `
+        #include <color_fragment>
+        vec3 dEdgeMeters = max(vec3(0.0), (vec3(0.5) - abs(vLocalPos)) * vInstanceScale);
+        vec3 absNorm = abs(vLocalNormal);
+        float distToEdgeMeters = (absNorm.x > 0.5) ? min(dEdgeMeters.y, dEdgeMeters.z) : ((absNorm.y > 0.5) ? min(dEdgeMeters.x, dEdgeMeters.z) : min(dEdgeMeters.x, dEdgeMeters.y));
+        float mortarFactor = smoothstep(0.0, uMortarWidth, distToEdgeMeters);
+
+        if (vInstanceType < 0.5) {
+          vec3 baseBrick = (uWallColor * uWallGain) * (0.80 + 0.38 * vTint);
+          diffuseColor.rgb = baseBrick * mix(uMortarDarkness, 1.0, mortarFactor);
+        } else if (vInstanceType < 1.5) {
+          vec3 baseSlab = (uWallColor * uBaseGain) * (0.85 + 0.30 * vTint);
+          diffuseColor.rgb = baseSlab * mix(uMortarDarkness, 1.0, mortarFactor);
+        } else if (vInstanceType < 2.5) {
+          vec3 baseRoof = (uRoofColor * uRoofGain) * (0.82 + 0.36 * vTint);
+          diffuseColor.rgb = baseRoof * mix(uMortarDarkness, 1.0, mortarFactor);
+        } else if (vInstanceType < 3.5) {
+          diffuseColor.rgb = uTrimColor * uTrimGain;
+        } else if (vInstanceType < 4.5) {
+          diffuseColor.rgb = vec3(0.10, 0.06, 0.03);
+        } else if (vInstanceType < 5.5) {
+          diffuseColor.rgb = uWindowGlowColor * 0.75;
+        } else {
+          diffuseColor.rgb = uAccentColor * 0.35;
+        }
+        // Mirror reflection: opacity 0.12 fading out over 2m (vWorldY goes 0 to 2m)
+        float refFade = clamp(1.0 - (vWorldY / 2.0), 0.0, 1.0);
+        diffuseColor.a = 0.12 * refFade * uSceneBrightness * vAmbientAlpha;
+        `
+      ).replace(
+        '#include <emissivemap_fragment>',
+        `
+        #include <emissivemap_fragment>
+        if (vInstanceType > 4.5 && vInstanceType < 5.5) {
+          float refFade = clamp(1.0 - (vWorldY / 2.0), 0.0, 1.0);
+          totalEmissiveRadiance = uWindowGlowColor * (0.80 * (0.12 * refFade) * uEmissiveFade * uSceneBrightness * vAmbientAlpha);
+        }
+        `
+      ).replace(
+        '#include <dithering_fragment>',
+        `
+        #include <dithering_fragment>
+        float refFade = clamp(1.0 - (vWorldY / 2.0), 0.0, 1.0);
+        gl_FragColor.a = 0.12 * refFade * uSceneBrightness * vAmbientAlpha;
+        `
+      );
+    };
+
+    this.reflectedGroup = new THREE.Group();
+    this.reflectedGroup.scale.set(1.0, -1.0, 1.0);
+    this.reflectedGroup.position.set(0.0, -0.05, 0.0);
+
+    this.reflectedMesh = new THREE.InstancedMesh(brickGeo, this.reflectedMaterial, count);
+    this.reflectedMesh.instanceMatrix = this.instancedCubes.instanceMatrix;
+    this.reflectedMesh.frustumCulled = false;
+    this.reflectedGroup.add(this.reflectedMesh);
+    this.stage.add(this.reflectedGroup);
   }
 
   public startTransitionTo(targetMode: 'house' | 'ambient', clickTime?: number): void {
@@ -1767,11 +2250,14 @@ export class HouseOrb {
     window.addEventListener('theme-change', (e: Event) => {
       const customEvt = e as CustomEvent<{ theme?: string }>;
       const themeId = customEvt.detail?.theme || (typeof document !== 'undefined' ? document.documentElement.getAttribute('data-theme') : null) || 'neon';
+      this.currentThemeId = themeId;
       const sceneCfg = getThemeSceneConfig(themeId);
+      const houseCfg = getThemeHouseConfig(themeId);
       this.themeConfig = sceneCfg;
+      this.houseConfig = houseCfg;
 
       const isLight = themeId === 'light';
-      const newHex = isLight ? '#2c5282' : (this.readCssVariable('--house-color') || '#00f0ff');
+      const newHex = this.readCssVariable('--house-color') || houseCfg.wall;
       const newAccent2 = this.readCssVariable('--accent-2') || (isLight ? '#059669' : '#10b981');
       const newBg = sceneCfg.bg;
       const newAccent = this.readCssVariable('--accent') || (isLight ? '#0284c7' : '#06b6d4');
@@ -1782,6 +2268,24 @@ export class HouseOrb {
       this.targetBgColor.copy(this.parseRgbOnly(newBg));
       this.targetAccentColor.copy(this.parseRgbOnly(newAccent));
       this.targetGlowColor.copy(this.parseRgbOnly(newGlow));
+
+      this.targetWallColor.set(houseCfg.wall);
+      this.targetRoofColor.set(houseCfg.roof);
+      this.targetMortarColor.set(houseCfg.mortar);
+      this.targetTrimColor.set(houseCfg.trim);
+      this.targetWindowGlowColor.set(houseCfg.windowGlow);
+      this.targetSmokeColor.set(houseCfg.smoke || '#94a3b8');
+
+      if (!this.isTune && this.cubeUniforms) {
+        this.cubeUniforms.uWallGain.value = houseCfg.wallGain;
+        this.cubeUniforms.uRoofGain.value = houseCfg.roofGain;
+        this.cubeUniforms.uBaseGain.value = houseCfg.baseGain;
+        this.cubeUniforms.uTrimGain.value = houseCfg.trimGain;
+        this.cubeUniforms.uMortarDarkness.value = houseCfg.mortarDarkness;
+        this.cubeUniforms.uMortarWidth.value = houseCfg.mortarWidth;
+        this.cubeUniforms.uMortarGlow.value = houseCfg.mortarGlow;
+        this.cubeUniforms.uMaxLuma.value = houseCfg.maxLuma;
+      }
 
       this.targetStarColor.set(sceneCfg.starColor);
       this.targetDustColor.set(sceneCfg.dustColor);
@@ -1822,6 +2326,48 @@ export class HouseOrb {
       }
     }
 
+    if (!this.currentWallColor.equals(this.targetWallColor)) {
+      this.currentWallColor.lerp(this.targetWallColor, 0.12);
+      if (this.cubeUniforms?.uWallColor) {
+        this.cubeUniforms.uWallColor.value.copy(this.currentWallColor);
+      }
+    }
+
+    if (!this.currentRoofColor.equals(this.targetRoofColor)) {
+      this.currentRoofColor.lerp(this.targetRoofColor, 0.12);
+      if (this.cubeUniforms?.uRoofColor) {
+        this.cubeUniforms.uRoofColor.value.copy(this.currentRoofColor);
+      }
+    }
+
+    if (!this.currentMortarColor.equals(this.targetMortarColor)) {
+      this.currentMortarColor.lerp(this.targetMortarColor, 0.12);
+      if (this.cubeUniforms?.uMortarColor) {
+        this.cubeUniforms.uMortarColor.value.copy(this.currentMortarColor);
+      }
+    }
+
+    if (!this.currentTrimColor.equals(this.targetTrimColor)) {
+      this.currentTrimColor.lerp(this.targetTrimColor, 0.12);
+      if (this.cubeUniforms?.uTrimColor) {
+        this.cubeUniforms.uTrimColor.value.copy(this.currentTrimColor);
+      }
+    }
+
+    if (!this.currentWindowGlowColor.equals(this.targetWindowGlowColor)) {
+      this.currentWindowGlowColor.lerp(this.targetWindowGlowColor, 0.12);
+      if (this.cubeUniforms?.uWindowGlowColor) {
+        this.cubeUniforms.uWindowGlowColor.value.copy(this.currentWindowGlowColor);
+      }
+    }
+
+    if (!this.currentSmokeColor.equals(this.targetSmokeColor)) {
+      this.currentSmokeColor.lerp(this.targetSmokeColor, 0.12);
+      if (this.smokeUniforms?.uColor) {
+        this.smokeUniforms.uColor.value.copy(this.currentSmokeColor);
+      }
+    }
+
     if (!this.currentAccent2Color.equals(this.targetAccent2Color)) {
       this.currentAccent2Color.lerp(this.targetAccent2Color, 0.12);
       if (this.cubeUniforms?.uAccent2Color) {
@@ -1849,6 +2395,9 @@ export class HouseOrb {
       }
       if (this.innerUniforms?.uGlowColor) {
         this.innerUniforms.uGlowColor.value.copy(this.currentGlowColor);
+      }
+      if (this.cubeUniforms?.uGlowColor) {
+        this.cubeUniforms.uGlowColor.value.copy(this.currentGlowColor);
       }
       if (this.groundDiskMaterial?.uniforms?.uGlowColor) {
         this.groundDiskMaterial.uniforms.uGlowColor.value.copy(this.currentGlowColor);
@@ -1926,6 +2475,9 @@ export class HouseOrb {
     if (this.innerUniforms?.uTime) {
       this.innerUniforms.uTime.value = time;
     }
+    if (this.smokeUniforms?.uTime) {
+      this.smokeUniforms.uTime.value = time;
+    }
 
     if (this.transitionState === 'house_to_ambient') {
       this.transitionElapsed += dt;
@@ -1950,6 +2502,15 @@ export class HouseOrb {
       const gFade = Math.max(0.0, 1.0 - tau / 0.30);
       if (this.groundDiskMaterial?.uniforms?.uFade) {
         this.groundDiskMaterial.uniforms.uFade.value = gFade;
+      }
+      if (this.contactShadowUniforms?.uFade) {
+        this.contactShadowUniforms.uFade.value = gFade;
+      }
+      if (this.smokeUniforms?.uFade) {
+        this.smokeUniforms.uFade.value = gFade;
+      }
+      if (this.reflectedGroup) {
+        this.reflectedGroup.visible = (gFade > 0.05);
       }
       if (this.windowSpotMaterial?.uniforms?.uFade) {
         this.windowSpotMaterial.uniforms.uFade.value = gFade;
@@ -2052,10 +2613,19 @@ export class HouseOrb {
         this.cubeUniforms.uEmissiveFade.value = emFade;
       }
 
-      // Ground disk & ring fade in over tau in [0.65, 1.0]
+      // Ground disk, contact shadow, smoke & ring fade in over tau in [0.65, 1.0]
       const groundFade = Math.max(0.0, Math.min(1.0, (tau - 0.65) / 0.35));
       if (this.groundDiskMaterial?.uniforms?.uFade) {
         this.groundDiskMaterial.uniforms.uFade.value = groundFade;
+      }
+      if (this.contactShadowUniforms?.uFade) {
+        this.contactShadowUniforms.uFade.value = groundFade;
+      }
+      if (this.smokeUniforms?.uFade) {
+        this.smokeUniforms.uFade.value = emFade;
+      }
+      if (this.reflectedGroup) {
+        this.reflectedGroup.visible = (groundFade > 0.05);
       }
       if (this.windowSpotMaterial?.uniforms?.uFade) {
         this.windowSpotMaterial.uniforms.uFade.value = emFade;
@@ -2184,6 +2754,15 @@ export class HouseOrb {
       if (this.groundDiskMaterial?.uniforms?.uFade) {
         this.groundDiskMaterial.uniforms.uFade.value = 0.0;
       }
+      if (this.contactShadowUniforms?.uFade) {
+        this.contactShadowUniforms.uFade.value = 0.0;
+      }
+      if (this.smokeUniforms?.uFade) {
+        this.smokeUniforms.uFade.value = 0.0;
+      }
+      if (this.reflectedGroup) {
+        this.reflectedGroup.visible = false;
+      }
       if (this.windowSpotMaterial?.uniforms?.uFade) {
         this.windowSpotMaterial.uniforms.uFade.value = 0.0;
       }
@@ -2260,6 +2839,15 @@ export class HouseOrb {
       if (this.groundDiskMaterial?.uniforms?.uFade) {
         this.groundDiskMaterial.uniforms.uFade.value = 1.0;
       }
+      if (this.contactShadowUniforms?.uFade) {
+        this.contactShadowUniforms.uFade.value = 1.0;
+      }
+      if (this.smokeUniforms?.uFade) {
+        this.smokeUniforms.uFade.value = 1.0;
+      }
+      if (this.reflectedGroup) {
+        this.reflectedGroup.visible = true;
+      }
       if (this.windowSpotMaterial?.uniforms?.uFade) {
         this.windowSpotMaterial.uniforms.uFade.value = 1.0;
       }
@@ -2274,6 +2862,48 @@ export class HouseOrb {
         if (alphaAttr && alphaAttr.array) {
           (alphaAttr.array as Float32Array).fill(1.0);
           alphaAttr.needsUpdate = true;
+        }
+      }
+
+      // 2) Living windows: each window dims by 30-50% for 0.6-1.5s every 8-25s; one window occasionally shuts off for 3-6s
+      if (this.windowEmissiveArray && this.windowEmissiveAttr && this.windowGroups.length > 0) {
+        let needsAttrUpdate = false;
+        for (const group of this.windowGroups) {
+          let mult = 1.0;
+
+          if (group.isOffWindow) {
+            if (time >= group.nextOffTime && time < group.nextOffTime + group.offDuration) {
+              const tOff = time - group.nextOffTime;
+              const fadeIn = Math.min(1.0, tOff / 0.4);
+              const fadeOut = Math.min(1.0, (group.offDuration - tOff) / 0.4);
+              mult = 1.0 - Math.max(0.0, Math.min(fadeIn, fadeOut));
+              needsAttrUpdate = true;
+            } else if (time >= group.nextOffTime + group.offDuration) {
+              group.nextOffTime = time + 20.0 + Math.random() * 25.0;
+              group.offDuration = 3.0 + Math.random() * 3.0; // 3–6s
+            }
+          }
+
+          if (mult > 0.999) {
+            if (time >= group.nextDimTime && time < group.nextDimTime + group.dimDuration) {
+              const p = (time - group.nextDimTime) / group.dimDuration;
+              const curve = Math.sin(p * Math.PI);
+              mult = 1.0 - group.dimDepth * curve;
+              needsAttrUpdate = true;
+            } else if (time >= group.nextDimTime + group.dimDuration) {
+              group.nextDimTime = time + 8.0 + Math.random() * 17.0; // 8–25s
+              group.dimDuration = 0.6 + Math.random() * 0.9;         // 0.6–1.5s
+              group.dimDepth = 0.30 + Math.random() * 0.20;          // 30–50%
+            }
+          }
+
+          for (let j = 0; j < group.paneIndices.length; j++) {
+            const pIdx = group.paneIndices[j];
+            this.windowEmissiveArray[pIdx] = group.baseEmissives[j] * mult;
+          }
+        }
+        if (needsAttrUpdate) {
+          this.windowEmissiveAttr.needsUpdate = true;
         }
       }
 
@@ -2438,24 +3068,39 @@ export class HouseOrb {
     if (!import.meta.env.DEV || typeof window === 'undefined') return;
     try {
       const { GUI } = await import('lil-gui');
-      const gui = new GUI({ title: '3D Camera Tune (?tune=1)' });
+      const gui = new GUI({ title: '3D Scene & House Tune (?tune=1)' });
       this.gui = gui;
       gui.domElement.style.position = 'fixed';
       gui.domElement.style.top = '16px';
       gui.domElement.style.right = '16px';
       gui.domElement.style.zIndex = '99999';
 
+      const initialHouse = this.houseConfig || getThemeHouseConfig(this.currentThemeId);
       const params = {
         elevation: this.cameraElevation,
         azimuth: this.cameraAzimuth,
         fov: this.cameraFov,
         lookAtY: this.cameraLookAtY,
+        wallGain: this.cubeUniforms?.uWallGain?.value ?? initialHouse.wallGain,
+        roofGain: this.cubeUniforms?.uRoofGain?.value ?? initialHouse.roofGain,
+        mortarDarkness: this.cubeUniforms?.uMortarDarkness?.value ?? initialHouse.mortarDarkness,
+        uMortarWidth: this.cubeUniforms?.uMortarWidth?.value ?? initialHouse.mortarWidth,
+        maxLuma: this.cubeUniforms?.uMaxLuma?.value ?? initialHouse.maxLuma,
         copyJSON: () => {
           const config = {
-            fov: Math.round(params.fov),
-            elevation: Math.round(params.elevation * 10) / 10,
-            azimuth: Math.round(params.azimuth * 10) / 10,
-            lookAtY: Math.round(params.lookAtY * 100) / 100
+            camera: {
+              fov: Math.round(params.fov),
+              elevation: Math.round(params.elevation * 10) / 10,
+              azimuth: Math.round(params.azimuth * 10) / 10,
+              lookAtY: Math.round(params.lookAtY * 100) / 100
+            },
+            house: {
+              wallGain: Math.round(params.wallGain * 100) / 100,
+              roofGain: Math.round(params.roofGain * 100) / 100,
+              mortarDarkness: Math.round(params.mortarDarkness * 100) / 100,
+              mortarWidth: Math.round(params.uMortarWidth * 1000) / 1000,
+              maxLuma: Math.round(params.maxLuma * 100) / 100
+            }
           };
           const jsonStr = JSON.stringify(config, null, 2);
           if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -2463,15 +3108,15 @@ export class HouseOrb {
               btnCtrl.name('✔ Copied!');
               setTimeout(() => btnCtrl.name('Copy JSON'), 1800);
             }).catch(() => {
-              prompt('Copy camera config JSON:', jsonStr);
+              prompt('Copy tuning config JSON:', jsonStr);
             });
           } else {
-            prompt('Copy camera config JSON:', jsonStr);
+            prompt('Copy tuning config JSON:', jsonStr);
           }
         }
       };
 
-      const onChange = () => {
+      const onChangeCam = () => {
         this.cameraElevation = params.elevation;
         this.cameraAzimuth = params.azimuth;
         this.cameraFov = params.fov;
@@ -2481,10 +3126,31 @@ export class HouseOrb {
         this.recomputeFittingDist();
       };
 
-      gui.add(params, 'elevation', 5, 50, 1).name('elevation (5–50°)').onChange(onChange);
-      gui.add(params, 'azimuth', -60, 60, 1).name('azimuth (−60…60°)').onChange(onChange);
-      gui.add(params, 'fov', 20, 45, 1).name('fov (20–45)').onChange(onChange);
-      gui.add(params, 'lookAtY', -1, 1, 0.05).name('lookAtY (−1…1)').onChange(onChange);
+      const camFolder = gui.addFolder('Camera');
+      camFolder.add(params, 'elevation', 5, 50, 1).name('elevation (5–50°)').onChange(onChangeCam);
+      camFolder.add(params, 'azimuth', -60, 60, 1).name('azimuth (−60…60°)').onChange(onChangeCam);
+      camFolder.add(params, 'fov', 20, 45, 1).name('fov (20–45)').onChange(onChangeCam);
+      camFolder.add(params, 'lookAtY', -1, 1, 0.05).name('lookAtY (−1…1)').onChange(onChangeCam);
+      camFolder.open();
+
+      const houseFolder = gui.addFolder('House Shader Tuning');
+      houseFolder.add(params, 'wallGain', 0.05, 1.5, 0.01).name('wallGain').onChange((v: number) => {
+        if (this.cubeUniforms?.uWallGain) this.cubeUniforms.uWallGain.value = v;
+      });
+      houseFolder.add(params, 'roofGain', 0.05, 1.5, 0.01).name('roofGain').onChange((v: number) => {
+        if (this.cubeUniforms?.uRoofGain) this.cubeUniforms.uRoofGain.value = v;
+      });
+      houseFolder.add(params, 'mortarDarkness', 0.05, 1.0, 0.01).name('mortarDarkness').onChange((v: number) => {
+        if (this.cubeUniforms?.uMortarDarkness) this.cubeUniforms.uMortarDarkness.value = v;
+      });
+      houseFolder.add(params, 'uMortarWidth', 0.005, 0.08, 0.001).name('uMortarWidth').onChange((v: number) => {
+        if (this.cubeUniforms?.uMortarWidth) this.cubeUniforms.uMortarWidth.value = v;
+      });
+      houseFolder.add(params, 'maxLuma', 0.20, 1.0, 0.01).name('maxLuma').onChange((v: number) => {
+        if (this.cubeUniforms?.uMaxLuma) this.cubeUniforms.uMaxLuma.value = v;
+      });
+      houseFolder.open();
+
       const btnCtrl = gui.add(params, 'copyJSON').name('Copy JSON');
     } catch (err) {
       console.warn('[HouseOrb] Failed to load lil-gui for ?tune=1:', err);

@@ -19,6 +19,23 @@ export interface ThemeScene3DConfig {
   camera: ThemeCameraConfig;
 }
 
+export interface ThemeHouseConfig {
+  wall: string;
+  roof: string;
+  mortar: string;
+  trim: string;
+  windowGlow: string;
+  smoke: string;
+  wallGain: number;
+  roofGain: number;
+  baseGain: number;
+  trimGain: number;
+  mortarDarkness: number;
+  mortarWidth: number;
+  mortarGlow: number; // 0.04 in dark themes, 0.0 in light
+  maxLuma: number;    // anti-burnout ceiling (>= 0.45 in dark themes)
+}
+
 export interface ThemePreset {
   id: string;
   name: string;
@@ -44,6 +61,7 @@ export interface ThemePreset {
     footerHeading: string;
   };
   scene3d: ThemeScene3DConfig;
+  house: ThemeHouseConfig;
 }
 
 /**
@@ -96,6 +114,22 @@ export const THEME_PRESETS: Record<string, ThemePreset> = {
         azimuth: 32,
         lookAtY: 0
       }
+    },
+    house: {
+      wall: '#00f0ff',
+      roof: '#0284c7',
+      mortar: '#00f0ff',
+      trim: '#38bdf8',
+      windowGlow: '#ffb35c',
+      smoke: '#94a3b8',
+      wallGain: 0.35,
+      roofGain: 0.30,
+      baseGain: 0.20,
+      trimGain: 0.42,
+      mortarDarkness: 0.35,
+      mortarWidth: 0.025,
+      mortarGlow: 0.04,
+      maxLuma: 0.54
     }
   },
   warm: {
@@ -139,6 +173,22 @@ export const THEME_PRESETS: Record<string, ThemePreset> = {
         azimuth: 32,
         lookAtY: 0
       }
+    },
+    house: {
+      wall: '#f59e0b',
+      roof: '#d97706',
+      mortar: '#f59e0b',
+      trim: '#fbbf24',
+      windowGlow: '#fed7aa',
+      smoke: '#a8a29e',
+      wallGain: 0.35,
+      roofGain: 0.30,
+      baseGain: 0.20,
+      trimGain: 0.42,
+      mortarDarkness: 0.35,
+      mortarWidth: 0.025,
+      mortarGlow: 0.04,
+      maxLuma: 0.54
     }
   },
   forest: {
@@ -182,6 +232,22 @@ export const THEME_PRESETS: Record<string, ThemePreset> = {
         azimuth: 32,
         lookAtY: 0
       }
+    },
+    house: {
+      wall: '#10b981',
+      roof: '#059669',
+      mortar: '#10b981',
+      trim: '#34d399',
+      windowGlow: '#fef08a',
+      smoke: '#94a3b8',
+      wallGain: 0.35,
+      roofGain: 0.30,
+      baseGain: 0.20,
+      trimGain: 0.42,
+      mortarDarkness: 0.35,
+      mortarWidth: 0.025,
+      mortarGlow: 0.04,
+      maxLuma: 0.54
     }
   },
   sunset: {
@@ -225,6 +291,22 @@ export const THEME_PRESETS: Record<string, ThemePreset> = {
         azimuth: 32,
         lookAtY: 0
       }
+    },
+    house: {
+      wall: '#c084fc',
+      roof: '#a855f7',
+      mortar: '#c084fc',
+      trim: '#f472b6',
+      windowGlow: '#fed7aa',
+      smoke: '#cbd5e1',
+      wallGain: 0.35,
+      roofGain: 0.30,
+      baseGain: 0.20,
+      trimGain: 0.42,
+      mortarDarkness: 0.35,
+      mortarWidth: 0.025,
+      mortarGlow: 0.04,
+      maxLuma: 0.54
     }
   },
   light: {
@@ -268,6 +350,22 @@ export const THEME_PRESETS: Record<string, ThemePreset> = {
         azimuth: 32,
         lookAtY: 0
       }
+    },
+    house: {
+      wall: '#2c5282',
+      roof: '#1a365d',
+      mortar: '#cbd5e1',
+      trim: '#2b6cb0',
+      windowGlow: '#dd6b20',
+      smoke: '#64748b',
+      wallGain: 0.85,
+      roofGain: 0.72,
+      baseGain: 0.55,
+      trimGain: 0.90,
+      mortarDarkness: 0.35,
+      mortarWidth: 0.025,
+      mortarGlow: 0.0,
+      maxLuma: 0.75
     }
   }
 };
@@ -277,4 +375,9 @@ export const DEFAULT_THEME = 'neon';
 export function getThemeSceneConfig(themeId: string): ThemeScene3DConfig {
   const preset = THEME_PRESETS[themeId] || THEME_PRESETS[DEFAULT_THEME];
   return preset.scene3d;
+}
+
+export function getThemeHouseConfig(themeId: string): ThemeHouseConfig {
+  const preset = THEME_PRESETS[themeId] || THEME_PRESETS[DEFAULT_THEME];
+  return preset.house;
 }
