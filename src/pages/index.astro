@@ -128,47 +128,34 @@ const faqItems = [
   description={SITE_DESCRIPTION}
   faq={faqItems}
 >
-  <!-- 1. Soft ambient radial glow behind house model (z-index: 0, behind canvas, 40% quieter) -->
-  <div
-    class="fixed inset-0 pointer-events-none z-0 hidden min-[900px]:block"
-    style="background: radial-gradient(circle 60vh at 66% 46%, rgba(15, 58, 71, 0.6) 0%, rgba(15, 58, 71, 0.3) 45%, transparent 100%);"
-    aria-hidden="true"
-  ></div>
-  <div
-    class="fixed inset-0 pointer-events-none z-0 min-[900px]:hidden"
-    style="background: radial-gradient(circle 45vh at 50% 22.5vh, rgba(15, 58, 71, 0.6) 0%, rgba(15, 58, 71, 0.3) 45%, transparent 100%);"
-    aria-hidden="true"
-  ></div>
-
-  <!-- 2. Darkening gradient under text placed BEHIND canvas (z-index: 0): no foggy haze over house -->
-  <div
-    class="fixed inset-0 z-0 pointer-events-none hidden min-[900px]:block"
-    style="background: linear-gradient(90deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 95%, transparent) 35%, color-mix(in srgb, var(--bg) 40%, transparent) 46%, transparent 56%);"
-    aria-hidden="true"
-  ></div>
-
-  <!-- Mobile darkening gradient behind canvas (z-index: 0): transparent on top for house, darkens to --bg below for text -->
-  <div
-    class="fixed inset-0 z-0 pointer-events-none min-[900px]:hidden"
-    style="background: linear-gradient(to bottom, transparent 0%, transparent clamp(200px, 30svh, 320px), color-mix(in srgb, var(--bg) 90%, transparent) clamp(250px, 36svh, 380px), var(--bg) clamp(300px, 44svh, 460px));"
-    aria-hidden="true"
-  ></div>
-
-  <!-- 4. Deep Vignette Layer behind content, gentle edges only -->
-  <div
-    class="fixed inset-0 z-0 pointer-events-none"
-    style="background: radial-gradient(circle at 65% 50%, transparent 55%, rgba(0, 0, 0, var(--vignette-opacity)) 100%);"
-    aria-hidden="true"
-  ></div>
-
-  <!-- 5. Static Film Grain Layer (z-index: 2, 3% opacity) -->
-  <div
-    class="film-grain-layer fixed inset-0 z-[2] pointer-events-none"
-    aria-hidden="true"
-  ></div>
-
   <!-- Hero Section (Content with z-index: 10 on top of fixed canvas and scrims) -->
-  <section class="hero-section relative flex flex-col justify-start px-4 sm:px-6 lg:px-8 z-10">
+  <section class="hero-section relative flex flex-col justify-start px-4 sm:px-6 lg:px-8 z-10 overflow-hidden">
+    <!-- 1. Soft ambient radial glow behind house model strictly in Hero (40% quieter) -->
+    <div
+      class="absolute inset-0 pointer-events-none -z-10 hidden min-[900px]:block"
+      style="background: radial-gradient(circle 60vh at 66% 46%, rgba(15, 58, 71, 0.6) 0%, rgba(15, 58, 71, 0.3) 45%, transparent 100%);"
+      aria-hidden="true"
+    ></div>
+    <div
+      class="absolute inset-0 pointer-events-none -z-10 min-[900px]:hidden"
+      style="background: radial-gradient(circle 45vh at 50% 22.5vh, rgba(15, 58, 71, 0.6) 0%, rgba(15, 58, 71, 0.3) 45%, transparent 100%);"
+      aria-hidden="true"
+    ></div>
+
+    <!-- 2. Darkening gradient under hero text (strictly confined to hero, never leaks into footer or lower sections) -->
+    <div
+      class="absolute inset-0 -z-10 pointer-events-none hidden min-[900px]:block"
+      style="background: linear-gradient(90deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 95%, transparent) 35%, color-mix(in srgb, var(--bg) 40%, transparent) 46%, transparent 56%);"
+      aria-hidden="true"
+    ></div>
+
+    <!-- Mobile darkening gradient strictly confined to hero -->
+    <div
+      class="absolute inset-0 -z-10 pointer-events-none min-[900px]:hidden"
+      style="background: linear-gradient(to bottom, transparent 0%, transparent clamp(200px, 30svh, 320px), color-mix(in srgb, var(--bg) 90%, transparent) clamp(250px, 36svh, 380px), var(--bg) clamp(300px, 44svh, 460px));"
+      aria-hidden="true"
+    ></div>
+
     <div class="max-w-7xl mx-auto w-full flex-grow flex flex-col min-[900px]:flex-row min-[900px]:items-stretch min-[900px]:justify-between gap-4 min-[900px]:gap-8 relative">
       
       <!-- #house-anchor:

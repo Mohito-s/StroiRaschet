@@ -266,6 +266,7 @@ interface CubeData {
   isAmbient?: boolean;
   ambientPos?: THREE.Vector3;
   ambientScale?: THREE.Vector3;
+  baseAlpha?: number;
   driftFreq?: THREE.Vector3;
   driftPhase?: THREE.Vector3;
   driftAmp?: THREE.Vector3;
@@ -846,6 +847,9 @@ export class HouseOrb {
     brickGeo.setAttribute('instanceType', new THREE.InstancedBufferAttribute(typeArray, 1));
     brickGeo.setAttribute('aTint', new THREE.InstancedBufferAttribute(tintArray, 1));
     brickGeo.setAttribute('aWindowEmissive', new THREE.InstancedBufferAttribute(windowEmissiveArray, 1));
+    const ambientAlphaArray = new Float32Array(count);
+    ambientAlphaArray.fill(1.0);
+    brickGeo.setAttribute('aAmbientAlpha', new THREE.InstancedBufferAttribute(ambientAlphaArray, 1));
 
     this.cubeMaterial = new THREE.MeshStandardMaterial({
       color: 0xffffff,
@@ -876,10 +880,12 @@ export class HouseOrb {
         attribute float instanceType;
         attribute float aTint;
         attribute float aWindowEmissive;
+        attribute float aAmbientAlpha;
 
         varying float vInstanceType;
         varying float vTint;
         varying float vWindowEmissive;
+        varying float vAmbientAlpha;
         varying vec2 vWindowUv;
         varying vec3 vLocalPos;
         varying vec3 vLocalNormal;
@@ -891,6 +897,7 @@ export class HouseOrb {
         vInstanceType = instanceType;
         vTint = aTint;
         vWindowEmissive = aWindowEmissive;
+        vAmbientAlpha = aAmbientAlpha;
         vWindowUv = uv;
         vLocalPos = position;
         vLocalNormal = normal;
@@ -907,6 +914,7 @@ export class HouseOrb {
         varying float vInstanceType;
         varying float vTint;
         varying float vWindowEmissive;
+        varying float vAmbientAlpha;
         varying vec2 vWindowUv;
         varying vec3 vLocalPos;
         varying vec3 vLocalNormal;
@@ -950,7 +958,7 @@ export class HouseOrb {
           // chimney_rim: glowing accent rim
           diffuseColor.rgb = uAccentColor * 0.35;
         }
-        diffuseColor.rgb *= uSceneBrightness;
+        diffuseColor.rgb *= (uSceneBrightness * vAmbientAlpha);
         `
       ).replace(
         '#include <emissivemap_fragment>',
@@ -963,10 +971,10 @@ export class HouseOrb {
           vec3 amberEmissive = vec3(0.85, 0.50, 0.16) * 0.35;
           vec3 coreEmissive = vec3(1.0, 0.96, 0.90) * 1.0;
           vec3 winEmissive = mix(amberEmissive, coreEmissive, isCenter);
-          totalEmissiveRadiance = winEmissive * (min(1.0, vWindowEmissive) * (uEmissiveFade * uSceneBrightness));
+          totalEmissiveRadiance = winEmissive * (min(1.0, vWindowEmissive) * (uEmissiveFade * uSceneBrightness * vAmbientAlpha));
         } else if (vInstanceType > 5.5) {
           // Chimney rim: subtle accent glow
-          totalEmissiveRadiance = uAccentColor * (0.65 * uEmissiveFade * uSceneBrightness);
+          totalEmissiveRadiance = uAccentColor * (0.65 * uEmissiveFade * uSceneBrightness * vAmbientAlpha);
         }
         `
       ).replace(
@@ -1040,14 +1048,47 @@ export class HouseOrb {
       const scale = new THREE.Vector3(item.s[0], item.s[1], item.s[2]);
 
       const isAmbient = (i % ambientStep === 0) && (ambientCount < 380);
-      if (isAmbient) ambientCount++;
+      const ambientPos = new THREE.Vector3();
+      const ambientScale = new THREE.Vector3();
+      let baseAlpha = 1.0;
 
-      const ambientPos = new THREE.Vector3(
-        (Math.random() - 0.5) * 36.0,
-        -2.5 + Math.random() * 18.0,
-        -24.0 + Math.random() * 22.0
-      );
-      const ambientScale = new THREE.Vector3(0.12, 0.12, 0.12);
+      if (isAmbient) {
+        ambientCount++;
+        // Requirement 1: 80% <= 0.4 of previous (<= 0.048), large (up to 5%) only far and pale, 15% medium
+        const randType = Math.random();
+        if (randType < 0.80) {
+          // 80%: small particles, size <= 0.4 of 0.12 (0.024 .. 0.044)
+          const s = 0.024 + Math.random() * 0.020;
+          ambientScale.set(s, s, s);
+          ambientPos.set(
+            (Math.random() - 0.5) * 36.0,
+            -3.0 + Math.random() * 18.0,
+            -22.0 + Math.random() * 14.0 // Z in [-22, -8]
+          );
+          baseAlpha = 0.85;
+        } else if (randType < 0.85) {
+          // 5%: large particles, ONLY far away and pale
+          const s = 0.080 + Math.random() * 0.025;
+          ambientScale.set(s, s, s);
+          ambientPos.set(
+            (Math.random() - 0.5) * 34.0,
+            -2.5 + Math.random() * 17.0,
+            -28.0 + Math.random() * 8.0 // strictly deep: Z in [-28, -20]
+          );
+          baseAlpha = 0.28; // pale
+        } else {
+          // 15%: medium particles (0.048 .. 0.064)
+          const s = 0.048 + Math.random() * 0.016;
+          ambientScale.set(s, s, s);
+          ambientPos.set(
+            (Math.random() - 0.5) * 35.0,
+            -3.0 + Math.random() * 18.0,
+            -20.0 + Math.random() * 10.0 // Z in [-20, -10]
+          );
+          baseAlpha = 0.60;
+        }
+      }
+
       const driftFreq = new THREE.Vector3(
         0.15 + Math.random() * 0.35,
         0.20 + Math.random() * 0.40,
@@ -1106,6 +1147,7 @@ export class HouseOrb {
         isAmbient,
         ambientPos,
         ambientScale,
+        baseAlpha,
         driftFreq,
         driftPhase,
         driftAmp
@@ -1430,6 +1472,7 @@ export class HouseOrb {
       this.transitionState = 'ambient_to_house';
       this.transitionElapsed = 0.0;
       this.transitionDuration = 1.4;
+      this.wasMatrixDirty = true;
       this.recomputeFittingDist();
     }
   }
@@ -1915,6 +1958,9 @@ export class HouseOrb {
         this.ringMaterial.opacity = (0.21 + 0.21 * (0.5 + 0.5 * Math.sin(time * 1.8))) * gFade;
       }
 
+      const alphaAttr = this.instancedCubes.geometry.getAttribute('aAmbientAlpha') as THREE.InstancedBufferAttribute;
+      const alphaArray = alphaAttr?.array as Float32Array;
+
       // Wave dispersal based on distance from center and height
       for (let i = 0; i < this.cubesData.length; i++) {
         const item = this.cubesData[i];
@@ -1932,13 +1978,28 @@ export class HouseOrb {
             item.ambientPos!.z + dz
           );
 
+          // Content-band attenuation & near-fade on target scale
+          const distFromCenter = Math.abs(targetPos.x);
+          const bandFactor = Math.max(0.0, Math.min(1.0, (distFromCenter - 3.5) / 2.2));
+          const contentScaleMult = 0.60 + 0.40 * bandFactor;
+          const contentAlphaMult = 0.25 + 0.75 * bandFactor;
+          let nearFade = 1.0;
+          if (targetPos.z > -7.0) {
+            nearFade = Math.max(0.0, Math.min(1.0, (-targetPos.z - 1.5) / 5.5));
+          }
+          const targetScale = item.ambientScale!.clone().multiplyScalar(contentScaleMult * nearFade);
+
           this.dummy.position.lerpVectors(item.basePos, targetPos, ease);
           this.dummy.rotation.set(
             item.baseRot.x + item.rotSpeed.x * ease * 2.0,
             item.baseRot.y + item.rotSpeed.y * ease * 2.0,
             item.baseRot.z + item.rotSpeed.z * ease * 2.0
           );
-          this.dummy.scale.lerpVectors(item.baseScale, item.ambientScale!, ease);
+          this.dummy.scale.lerpVectors(item.baseScale, targetScale, ease);
+
+          if (alphaArray) {
+            alphaArray[i] = THREE.MathUtils.lerp(1.0, (item.baseAlpha || 1.0) * contentAlphaMult * nearFade, ease);
+          }
         } else {
           const disperseOffset = item.dispersionDir.clone().multiplyScalar(ease * 1.8);
           this.dummy.position.copy(item.basePos).add(disperseOffset);
@@ -1949,12 +2010,16 @@ export class HouseOrb {
           );
           const s = Math.max(0.0, 1.0 - ease);
           this.dummy.scale.set(item.baseScale.x * s, item.baseScale.y * s, item.baseScale.z * s);
+          if (alphaArray) {
+            alphaArray[i] = Math.max(0.0, 1.0 - ease);
+          }
         }
 
         this.dummy.updateMatrix();
         this.instancedCubes.setMatrixAt(i, this.dummy.matrix);
       }
       this.instancedCubes.instanceMatrix.needsUpdate = true;
+      if (alphaAttr) alphaAttr.needsUpdate = true;
 
       // Inner frame fades to 0
       const innerEase = Math.max(0.0, 1.0 - Math.min(1.0, this.transitionElapsed / 0.35));
@@ -1998,6 +2063,9 @@ export class HouseOrb {
       if (this.ringMaterial) {
         this.ringMaterial.opacity = (0.21 + 0.21 * (0.5 + 0.5 * Math.sin(time * 1.8))) * groundFade;
       }
+
+      const alphaAttr = this.instancedCubes.geometry.getAttribute('aAmbientAlpha') as THREE.InstancedBufferAttribute;
+      const alphaArray = alphaAttr?.array as Float32Array;
 
       // Staged assembly by layer:
       for (let i = 0; i < this.cubesData.length; i++) {
@@ -2050,13 +2118,26 @@ export class HouseOrb {
             item.ambientPos!.z + dz
           );
 
+          const distFromCenter = Math.abs(curAmbientPos.x);
+          const bandFactor = Math.max(0.0, Math.min(1.0, (distFromCenter - 3.5) / 2.2));
+          const contentScaleMult = 0.60 + 0.40 * bandFactor;
+          const contentAlphaMult = 0.25 + 0.75 * bandFactor;
+          let nearFade = 1.0;
+          if (curAmbientPos.z > -7.0) {
+            nearFade = Math.max(0.0, Math.min(1.0, (-curAmbientPos.z - 1.5) / 5.5));
+          }
+          const startScale = item.ambientScale!.clone().multiplyScalar(contentScaleMult * nearFade);
+
           this.dummy.position.lerpVectors(curAmbientPos, item.basePos, ease);
           this.dummy.rotation.set(
             THREE.MathUtils.lerp(item.baseRot.x + item.rotSpeed.x * 2.0, item.baseRot.x, ease),
             THREE.MathUtils.lerp(item.baseRot.y + item.rotSpeed.y * 2.0, item.baseRot.y, ease),
             THREE.MathUtils.lerp(item.baseRot.z + item.rotSpeed.z * 2.0, item.baseRot.z, ease)
           );
-          this.dummy.scale.lerpVectors(item.ambientScale!, item.baseScale, ease);
+          this.dummy.scale.lerpVectors(startScale, item.baseScale, ease);
+          if (alphaArray) {
+            alphaArray[i] = THREE.MathUtils.lerp((item.baseAlpha || 1.0) * contentAlphaMult * nearFade, 1.0, ease);
+          }
         } else {
           const reverseOffset = item.dispersionDir.clone().multiplyScalar((1.0 - ease) * 1.8);
           this.dummy.position.copy(item.basePos).add(reverseOffset);
@@ -2066,12 +2147,16 @@ export class HouseOrb {
             THREE.MathUtils.lerp(item.baseRot.z + item.rotSpeed.z * 2.5, item.baseRot.z, ease)
           );
           this.dummy.scale.set(item.baseScale.x * ease, item.baseScale.y * ease, item.baseScale.z * ease);
+          if (alphaArray) {
+            alphaArray[i] = ease;
+          }
         }
 
         this.dummy.updateMatrix();
         this.instancedCubes.setMatrixAt(i, this.dummy.matrix);
       }
       this.instancedCubes.instanceMatrix.needsUpdate = true;
+      if (alphaAttr) alphaAttr.needsUpdate = true;
 
       // Inner frame fades in
       const innerEase = Math.max(0.0, Math.min(1.0, (this.transitionElapsed - 0.4) / 0.6));
@@ -2106,7 +2191,10 @@ export class HouseOrb {
         this.ringMaterial.opacity = 0.0;
       }
 
-      // Drift ambient particles
+      const alphaAttr = this.instancedCubes.geometry.getAttribute('aAmbientAlpha') as THREE.InstancedBufferAttribute;
+      const alphaArray = alphaAttr?.array as Float32Array;
+
+      // Drift ambient particles with content-band scaling and near-fade
       for (let i = 0; i < this.cubesData.length; i++) {
         const item = this.cubesData[i];
         if (item.isAmbient) {
@@ -2114,24 +2202,53 @@ export class HouseOrb {
           const driftY = Math.cos(time * item.driftFreq!.y + item.driftPhase!.y) * item.driftAmp!.y;
           const driftZ = Math.sin(time * item.driftFreq!.z + item.driftPhase!.z) * item.driftAmp!.z;
 
-          this.dummy.position.set(
-            item.ambientPos!.x + driftX,
-            item.ambientPos!.y + driftY,
-            item.ambientPos!.z + driftZ
-          );
+          const curX = item.ambientPos!.x + driftX;
+          const curY = item.ambientPos!.y + driftY;
+          const curZ = item.ambientPos!.z + driftZ;
+
+          // Requirement 2: Content band (central text container) attenuation
+          const distFromCenter = Math.abs(curX);
+          const bandFactor = Math.max(0.0, Math.min(1.0, (distFromCenter - 3.5) / 2.2));
+          const contentScaleMult = 0.60 + 0.40 * bandFactor; // x0.6 in content band, x1.0 outside
+          const contentAlphaMult = 0.25 + 0.75 * bandFactor; // x0.25 in content band, x1.0 outside
+
+          // Requirement 2: Near-fade (particles closer than safe depth fade out completely)
+          let nearFade = 1.0;
+          if (curZ > -7.0) {
+            nearFade = Math.max(0.0, Math.min(1.0, (-curZ - 1.5) / 5.5));
+          }
+
+          this.dummy.position.set(curX, curY, curZ);
           this.dummy.rotation.set(
             item.baseRot.x + time * item.rotSpeed.x * 0.2,
             item.baseRot.y + time * item.rotSpeed.y * 0.2,
             item.baseRot.z + time * item.rotSpeed.z * 0.2
           );
-          this.dummy.scale.copy(item.ambientScale!);
+
+          if (nearFade <= 0.001) {
+            this.dummy.scale.set(0, 0, 0);
+          } else {
+            this.dummy.scale.set(
+              item.ambientScale!.x * contentScaleMult * nearFade,
+              item.ambientScale!.y * contentScaleMult * nearFade,
+              item.ambientScale!.z * contentScaleMult * nearFade
+            );
+          }
+
+          if (alphaArray) {
+            alphaArray[i] = (item.baseAlpha || 1.0) * contentAlphaMult * nearFade;
+          }
         } else {
           this.dummy.scale.set(0, 0, 0);
+          if (alphaArray) {
+            alphaArray[i] = 0.0;
+          }
         }
         this.dummy.updateMatrix();
         this.instancedCubes.setMatrixAt(i, this.dummy.matrix);
       }
       this.instancedCubes.instanceMatrix.needsUpdate = true;
+      if (alphaAttr) alphaAttr.needsUpdate = true;
     } else {
       // Idle house mode:
       if (this.cubeUniforms?.uSceneBrightness) {
@@ -2153,6 +2270,11 @@ export class HouseOrb {
       if (this.wasMatrixDirty) {
         this.wasMatrixDirty = false;
         this.resetCubesToIdle();
+        const alphaAttr = this.instancedCubes.geometry.getAttribute('aAmbientAlpha') as THREE.InstancedBufferAttribute;
+        if (alphaAttr && alphaAttr.array) {
+          (alphaAttr.array as Float32Array).fill(1.0);
+          alphaAttr.needsUpdate = true;
+        }
       }
 
       // Idle micro-breathing pulse
