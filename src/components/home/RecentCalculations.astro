@@ -118,8 +118,7 @@
     }, { once: true });
   }
 
-  // Listen for storage changes
+  // Listen for storage changes and Astro page load
   window.addEventListener('my-house-updated', renderRecentCalculations);
-  document.addEventListener('DOMContentLoaded', renderRecentCalculations);
-  renderRecentCalculations();
+  document.addEventListener('astro:page-load', renderRecentCalculations);
 </script>

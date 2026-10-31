@@ -146,22 +146,26 @@ const buildDate = new Intl.DateTimeFormat('ru-RU', {
 </footer>
 
 <script>
-  const resetBtn = document.getElementById('reset-storage-btn');
-  if (resetBtn) {
-    resetBtn.addEventListener('click', () => {
-      if (confirm('Очистить сохранённый цвет 3D-дома и сохранённые значения калькуляторов в вашем браузере?')) {
-        localStorage.removeItem('houseColor');
-        localStorage.removeItem('cookieAccepted');
-        localStorage.removeItem('stroycalc_theme');
-        // Clear all calculator drafts
-        Object.keys(localStorage).forEach((key) => {
-          if (key.startsWith('calc_')) {
-            localStorage.removeItem(key);
-          }
-        });
-        alert('Локальные данные успешно очищены.');
-        window.location.reload();
-      }
-    });
+  function initFooter() {
+    const resetBtn = document.getElementById('reset-storage-btn');
+    if (resetBtn) {
+      resetBtn.onclick = () => {
+        if (confirm('Очистить сохранённый цвет 3D-дома и сохранённые значения калькуляторов в вашем браузере?')) {
+          localStorage.removeItem('houseColor');
+          localStorage.removeItem('cookieAccepted');
+          localStorage.removeItem('stroycalc_theme');
+          // Clear all calculator drafts
+          Object.keys(localStorage).forEach((key) => {
+            if (key.startsWith('calc_')) {
+              localStorage.removeItem(key);
+            }
+          });
+          alert('Локальные данные успешно очищены.');
+          window.location.reload();
+        }
+      };
+    }
   }
+
+  document.addEventListener('astro:page-load', initFooter);
 </script>

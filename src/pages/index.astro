@@ -154,13 +154,6 @@ const faqItems = [
     aria-hidden="true"
   ></div>
 
-  <!-- 3. Fixed Fullscreen 3D Canvas Mount Point (z-index: 1, in front of background gradients, behind hero text) -->
-  <div
-    id="house-orb-container"
-    class="fixed inset-0 w-full h-full pointer-events-none z-[1] overflow-hidden"
-    aria-hidden="true"
-  ></div>
-
   <!-- 4. Deep Vignette Layer behind content, gentle edges only -->
   <div
     class="fixed inset-0 z-0 pointer-events-none"
@@ -185,34 +178,7 @@ const faqItems = [
         id="house-anchor"
         class="w-full min-[900px]:w-[58%] min-[900px]:h-full min-[900px]:order-2 pointer-events-none flex-shrink-0 relative flex items-center justify-center overflow-visible"
         aria-hidden="true"
-      >
-        <!-- Inline check: if reassembling from subpage, hide poster immediately before first paint -->
-        <script is:inline>
-          try {
-            if (sessionStorage.getItem('house_should_assemble') === '1') {
-              var p = document.getElementById('house-poster');
-              if (p) p.style.display = 'none';
-            }
-          } catch (e) {}
-        </script>
-
-        <!-- Dark poster with WebP house & soft breathing pulse: visible immediately until compileAsync & frame 1 -->
-        <div
-          id="house-poster"
-          class="w-full h-full flex items-center justify-center transition-opacity duration-500 ease-out"
-        >
-          <img
-            src="/house-poster.webp"
-            alt="3D Модель дома"
-            width="668"
-            height="774"
-            class="w-auto h-auto max-w-[90%] max-h-[90%] object-contain select-none house-poster-pulse"
-            loading="eager"
-            fetchpriority="high"
-            decoding="sync"
-          />
-        </div>
-      </div>
+      ></div>
 
       <!-- Text Column:
            Desktop (>= 900px): Left column, width 42%, aligned to top with padding-top: clamp(88px, 12svh, 140px), order-1
@@ -430,106 +396,9 @@ const faqItems = [
   </section>
 </BaseLayout>
 
-<script>
-  // Dynamic import of Three.js and HouseOrb only on homepage
-  let currentHouseOrb: any = null;
-
-  function initHouseOrb() {
-    const container = document.getElementById('house-orb-container');
-    if (!container) return;
-    if (currentHouseOrb) return;
-
-    // Check prefers-reduced-motion
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (prefersReducedMotion) {
-      // Keep static poster visible
-      return;
-    }
-
-    // Check WebGL support
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-    if (!gl) {
-      // Keep static poster visible
-      return;
-    }
-
-    // Lazy load Three.js & HouseOrb
-    import('../components/HouseOrb')
-      .then(({ HouseOrb }) => {
-        if (currentHouseOrb) {
-          currentHouseOrb.destroy();
-        }
-        currentHouseOrb = new HouseOrb({ container });
-      })
-      .catch((err) => {
-        console.warn('[HouseOrb] Dynamic import failed, keeping poster:', err);
-      });
-  }
-
-  function scheduleInit() {
-    let shouldFastInit = false;
-    try {
-      shouldFastInit = sessionStorage.getItem('house_should_assemble') === '1';
-    } catch (e) {}
-
-    if (shouldFastInit) {
-      // User returned from an internal page: assemble immediately without idle delay
-      initHouseOrb();
-      return;
-    }
-
-    // Wait for the first rendered frame so hero text and WebP poster are fully painted without JS delay
-    requestAnimationFrame(() => {
-      if ('requestIdleCallback' in window) {
-        (window as any).requestIdleCallback(() => initHouseOrb(), { timeout: 1000 });
-      } else {
-        setTimeout(initHouseOrb, 50);
-      }
-    });
-  }
-
-  // Defer Three.js dynamic import until after first frame paint and idle
-  if (document.readyState === 'complete') {
-    scheduleInit();
-  } else {
-    window.addEventListener('load', scheduleInit, { once: true });
-  }
-
-  // Handle bfcache or back/forward navigation
-  window.addEventListener('pageshow', (e) => {
-    if (e.persisted || !document.getElementById('house-orb-container')?.querySelector('canvas')) {
-      initHouseOrb();
-    }
-  });
-
-  window.addEventListener('pagehide', () => {
-    if (currentHouseOrb) {
-      currentHouseOrb.destroy();
-      currentHouseOrb = null;
-    }
-  });
-</script>
-
 <style>
   .hero-section {
     min-height: min(100svh, 860px);
-  }
-
-  @keyframes housePulse {
-    0%, 100% {
-      transform: scale(1);
-      opacity: 0.94;
-    }
-    50% {
-      transform: scale(1.015);
-      opacity: 1;
-    }
-  }
-
-  .house-poster-pulse {
-    animation: housePulse 3.8s ease-in-out infinite;
-    will-change: transform, opacity;
   }
 
   @media (min-width: 900px) {

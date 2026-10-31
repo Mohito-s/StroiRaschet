@@ -275,10 +275,6 @@ const isLocked = Boolean(LOCKED_THEME);
     window.dispatchEvent(new CustomEvent('theme-change', { detail: { theme: themeId } }));
   }
 
-  // Run on page load
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initThemeSystem);
-  } else {
-    initThemeSystem();
-  }
+  // Run on Astro page load
+  document.addEventListener('astro:page-load', initThemeSystem);
 </script>

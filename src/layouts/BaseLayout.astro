@@ -1,4 +1,5 @@
 ---
+import { ClientRouter } from 'astro:transitions';
 import BaseHead from '../components/seo/BaseHead.astro';
 import JsonLd, { type BreadcrumbItem, type FaqItem, type WebAppInfo } from '../components/seo/JsonLd.astro';
 import Header from '../components/common/Header.astro';
@@ -33,13 +34,12 @@ const {
   publishedTime,
   modifiedTime
 } = Astro.props;
-
-const isHome = Astro.url.pathname === '/' || Astro.url.pathname === '';
 ---
 
 <!doctype html>
 <html lang="ru" data-theme="neon">
   <head>
+    <meta charset="utf-8" />
     <!-- Instant theme initialization to eliminate flash of unstyled theme -->
     <script is:inline>
       (function() {
@@ -62,6 +62,8 @@ const isHome = Astro.url.pathname === '/' || Astro.url.pathname === '';
       })();
     </script>
 
+    <ClientRouter />
+
     <BaseHead
       title={title}
       description={description}
@@ -78,8 +80,16 @@ const isHome = Astro.url.pathname === '/' || Astro.url.pathname === '';
     />
   </head>
   <body class="bg-[var(--bg)] text-[var(--text)] min-h-[100svh] flex flex-col selection:bg-[var(--glow)] selection:text-[var(--text)] transition-colors duration-300 relative">
-    <!-- Non-WebGL fixed ambient blueprint atmosphere (internal pages only; home page has dedicated 3D scene) -->
-    {!isHome && <AtmosphereBackground />}
+    <!-- Persistent Unified 3D WebGL Scene Root (Astro transition:persist preserves canvas and WebGL context across page navigations) -->
+    <div
+      id="scene-root"
+      transition:persist
+      aria-hidden="true"
+      class="fixed inset-0 w-full h-full pointer-events-none z-0 overflow-hidden"
+    ></div>
+
+    <!-- Soft static background blueprint atmosphere (used as fallback on weak devices or prefers-reduced-motion) -->
+    <AtmosphereBackground />
 
     <!-- Skip to content for Accessibility -->
     <a
@@ -106,21 +116,41 @@ const isHome = Astro.url.pathname === '/' || Astro.url.pathname === '';
     <!-- Privacy & Cookie Banner -->
     <CookieBanner />
 
-    <!-- Global listener for navigation to home page to trigger house reverse assembly -->
-    <script is:inline>
-      document.addEventListener('click', function(e) {
-        if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
-        var a = e.target && e.target.closest ? e.target.closest('a') : null;
-        if (!a) return;
-        var href = a.getAttribute('href');
-        if (!href) return;
-        var targetPath = href.split('?')[0].split('#')[0];
-        if (targetPath === '/' || targetPath === window.location.origin + '/' || targetPath === '/index.html') {
-          try {
-            sessionStorage.setItem('house_should_assemble', '1');
-          } catch (err) {}
-        }
+    <!-- Global Persistent Scene & Transition Controller -->
+    <script>
+      import { initGlobalScene, onPageLoadNav, startSceneTransition } from '../components/HouseOrb';
+
+      // Initialize persistent scene once on initial load
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => initGlobalScene());
+      } else {
+        initGlobalScene();
+      }
+
+      // Astro ClientRouter page load hook
+      document.addEventListener('astro:page-load', () => {
+        onPageLoadNav(window.location.pathname);
       });
+
+      // Immediate transition on link click (starts in <= 16ms, parallel to Astro navigation)
+      document.addEventListener('click', (e) => {
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+        const a = (e.target as HTMLElement)?.closest('a');
+        if (!a) return;
+        const href = a.getAttribute('href');
+        if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:') || a.target === '_blank' || a.hasAttribute('download')) return;
+
+        const clean = href.split('?')[0].split('#')[0];
+        const isTargetHome = clean === '/' || clean === '/index.html' || clean === '';
+        const isCurrentHome = window.location.pathname === '/' || window.location.pathname === '/index.html' || window.location.pathname === '';
+
+        const clickTime = performance.now();
+        if (isCurrentHome && !isTargetHome) {
+          startSceneTransition('ambient', clickTime);
+        } else if (!isCurrentHome && isTargetHome) {
+          startSceneTransition('house', clickTime);
+        }
+      }, { capture: true });
     </script>
   </body>
 </html>

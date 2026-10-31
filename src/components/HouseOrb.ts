@@ -250,11 +250,6 @@ export function fitCamera(
   return high;
 }
 
-function smoothstep(min: number, max: number, value: number): number {
-  const x = Math.max(0, Math.min(1, (value - min) / (max - min)));
-  return x * x * (3 - 2 * x);
-}
-
 export interface HouseOrbOptions {
   container: HTMLElement;
 }
@@ -267,6 +262,13 @@ interface CubeData {
   rotSpeed: THREE.Vector3;
   heightNorm: number;
   distNorm: number;
+  type?: string;
+  isAmbient?: boolean;
+  ambientPos?: THREE.Vector3;
+  ambientScale?: THREE.Vector3;
+  driftFreq?: THREE.Vector3;
+  driftPhase?: THREE.Vector3;
+  driftAmp?: THREE.Vector3;
 }
 
 // Procedural Soft Particle & Bokeh Textures
@@ -400,7 +402,6 @@ export class HouseOrb {
   // Lights for dynamic color transition & edge illumination
   private hemiLight!: THREE.HemisphereLight;
   private backLight!: THREE.DirectionalLight;
-  private fogColor = new THREE.Color('#0f3a47');
 
   // Inner frame instanced mesh
   private innerInstancedCubes!: THREE.InstancedMesh;
@@ -410,16 +411,17 @@ export class HouseOrb {
 
   // Smooth procedural floating tools manager (24 models desktop, 12 mobile)
 
-  // Interactive explosion & assembly state
-  private explosionState: 'idle' | 'exploding' | 'assembling' = 'idle';
-  private explosionProgress = 0.0; // 0.0 (assembled) -> 1.0 (dispersed)
-  private explodeElapsed = 0.0;
-  private assembleElapsed = 0.0;
-  private startAssembleProgress = 1.0;
-  private targetNavHref: string | null = null;
-  private hasNavigated = false;
-  private navTimer: any = null;
-  private wasExploded = false;
+  // Unified Scene Modes & Transitions (house on home, ambient on internal pages)
+  private mode: 'house' | 'ambient' = 'house';
+  private transitionState: 'idle' | 'house_to_ambient' | 'ambient_to_house' = 'idle';
+  private transitionElapsed = 0.0;
+  private transitionDuration = 1.1; // 1.1s house->ambient, 1.4s ambient->house
+  private turntableAngle = 0.0;
+  private lastAmbientRenderTime = 0.0;
+  private lastClickTimestamp = 0.0;
+  private clickToAnimTimeMs = 0.0;
+  private isWeakDevice = false;
+  private wasMatrixDirty = true;
 
   // Frame timing & dt accumulator (limits dt <= 1/20s so stutters don't eat animations)
   private hasRenderedFirstFrame = false;
@@ -439,7 +441,7 @@ export class HouseOrb {
   private targetGlowColor: THREE.Color;
 
   private animationFrameId: number | null = null;
-  private isDestroyed = false;
+  public isDestroyed = false;
   private isPaused = false;
   private resizeObserver?: ResizeObserver;
   private intersectionObserver?: IntersectionObserver;
@@ -510,15 +512,21 @@ export class HouseOrb {
     this.currentBokehOpacity = 0.06;
     this.targetBokehOpacity = 0.06;
 
-    if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('house_should_assemble') === '1') {
-      try {
-        sessionStorage.removeItem('house_should_assemble');
-      } catch (err) {}
-      this.explosionProgress = 1.0;
-      this.explosionState = 'assembling';
-      this.assembleElapsed = 0.0;
-      this.startAssembleProgress = 1.0;
-      this.wasExploded = true;
+    this.isWeakDevice = typeof navigator !== 'undefined' && typeof navigator.hardwareConcurrency === 'number' && navigator.hardwareConcurrency <= 4;
+    this.prefersReducedMotion = typeof window !== 'undefined' ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
+
+    const initialPath = typeof window !== 'undefined' ? window.location.pathname : '/';
+    const isInitialHome = initialPath === '/' || initialPath === '/index.html' || initialPath === '';
+
+    if (isInitialHome) {
+      this.mode = 'house';
+      this.transitionState = 'ambient_to_house'; // Initial assembly from scratch over 1.4s
+      this.transitionElapsed = 0.0;
+      this.transitionDuration = 1.4;
+    } else {
+      this.mode = 'ambient';
+      this.transitionState = 'idle';
+      this.transitionElapsed = 0.0;
     }
 
     const width = window.innerWidth;
@@ -652,7 +660,7 @@ export class HouseOrb {
     this.recomputeFittingDist();
 
     // Initial camera projection to anchor
-    this.updateAnchorProjection(0);
+    this.updateAnchorProjection(0, 0);
     this.baseCamPos.copy(this.camera.position);
     if (this.scene.fog && this.scene.fog instanceof THREE.FogExp2) {
       this.scene.fog.density = 0.325 / Math.max(1, this.currentDist);
@@ -851,7 +859,8 @@ export class HouseOrb {
       uHouseColor: { value: this.currentColor },
       uAccent2Color: { value: this.currentAccent2Color },
       uAccentColor: { value: this.currentAccentColor },
-      uEmissiveFade: { value: 1.0 }
+      uEmissiveFade: { value: 1.0 },
+      uSceneBrightness: { value: 1.0 }
     };
 
     this.cubeMaterial.customProgramCacheKey = () => 'house-bricks-pbr';
@@ -861,6 +870,7 @@ export class HouseOrb {
       shader.uniforms.uAccent2Color = this.cubeUniforms!.uAccent2Color;
       shader.uniforms.uAccentColor = this.cubeUniforms!.uAccentColor;
       shader.uniforms.uEmissiveFade = this.cubeUniforms!.uEmissiveFade;
+      shader.uniforms.uSceneBrightness = this.cubeUniforms!.uSceneBrightness;
 
       shader.vertexShader = `
         attribute float instanceType;
@@ -892,6 +902,7 @@ export class HouseOrb {
         uniform vec3 uAccent2Color;
         uniform vec3 uAccentColor;
         uniform float uEmissiveFade;
+        uniform float uSceneBrightness;
 
         varying float vInstanceType;
         varying float vTint;
@@ -939,6 +950,7 @@ export class HouseOrb {
           // chimney_rim: glowing accent rim
           diffuseColor.rgb = uAccentColor * 0.35;
         }
+        diffuseColor.rgb *= uSceneBrightness;
         `
       ).replace(
         '#include <emissivemap_fragment>',
@@ -951,10 +963,10 @@ export class HouseOrb {
           vec3 amberEmissive = vec3(0.85, 0.50, 0.16) * 0.35;
           vec3 coreEmissive = vec3(1.0, 0.96, 0.90) * 1.0;
           vec3 winEmissive = mix(amberEmissive, coreEmissive, isCenter);
-          totalEmissiveRadiance = winEmissive * (min(1.0, vWindowEmissive) * uEmissiveFade);
+          totalEmissiveRadiance = winEmissive * (min(1.0, vWindowEmissive) * (uEmissiveFade * uSceneBrightness));
         } else if (vInstanceType > 5.5) {
           // Chimney rim: subtle accent glow
-          totalEmissiveRadiance = uAccentColor * (0.65 * uEmissiveFade);
+          totalEmissiveRadiance = uAccentColor * (0.65 * uEmissiveFade * uSceneBrightness);
         }
         `
       ).replace(
@@ -1018,6 +1030,8 @@ export class HouseOrb {
 
     this.cubesData = [];
     const centerPoint = new THREE.Vector3(0, 2.5, 0);
+    const ambientStep = Math.max(1, Math.floor(count / 360));
+    let ambientCount = 0;
 
     for (let i = 0; i < count; i++) {
       const item = this.items[i];
@@ -1025,9 +1039,41 @@ export class HouseOrb {
       const rot = new THREE.Euler(item.rot[0], item.rot[1], item.rot[2]);
       const scale = new THREE.Vector3(item.s[0], item.s[1], item.s[2]);
 
+      const isAmbient = (i % ambientStep === 0) && (ambientCount < 380);
+      if (isAmbient) ambientCount++;
+
+      const ambientPos = new THREE.Vector3(
+        (Math.random() - 0.5) * 36.0,
+        -2.5 + Math.random() * 18.0,
+        -24.0 + Math.random() * 22.0
+      );
+      const ambientScale = new THREE.Vector3(0.12, 0.12, 0.12);
+      const driftFreq = new THREE.Vector3(
+        0.15 + Math.random() * 0.35,
+        0.20 + Math.random() * 0.40,
+        0.15 + Math.random() * 0.30
+      );
+      const driftPhase = new THREE.Vector3(
+        Math.random() * Math.PI * 2,
+        Math.random() * Math.PI * 2,
+        Math.random() * Math.PI * 2
+      );
+      const driftAmp = new THREE.Vector3(
+        1.2 + Math.random() * 1.5,
+        0.8 + Math.random() * 1.0,
+        1.0 + Math.random() * 1.2
+      );
+
       this.dummy.position.copy(pos);
       this.dummy.rotation.copy(rot);
-      if (this.explosionState === 'assembling') {
+      if (this.mode === 'ambient') {
+        if (isAmbient) {
+          this.dummy.position.copy(ambientPos);
+          this.dummy.scale.copy(ambientScale);
+        } else {
+          this.dummy.scale.set(0, 0, 0);
+        }
+      } else if (this.transitionState === 'ambient_to_house') {
         this.dummy.scale.set(0, 0, 0);
       } else {
         this.dummy.scale.copy(scale);
@@ -1055,7 +1101,14 @@ export class HouseOrb {
           (Math.random() - 0.5) * 2.5
         ),
         heightNorm,
-        distNorm
+        distNorm,
+        type: item.type,
+        isAmbient,
+        ambientPos,
+        ambientScale,
+        driftFreq,
+        driftPhase,
+        driftAmp
       });
     }
 
@@ -1191,7 +1244,7 @@ export class HouseOrb {
 
       this.dummy.position.copy(it.p);
       this.dummy.rotation.copy(it.rot);
-      if (this.explosionState === 'assembling') {
+      if (this.mode === 'ambient' || this.transitionState === 'ambient_to_house') {
         this.dummy.scale.set(0, 0, 0);
       } else {
         this.dummy.scale.copy(it.s);
@@ -1359,97 +1412,48 @@ export class HouseOrb {
     }
   }
 
-  public explode(targetHref?: string): void {
-    if (this.explosionState === 'exploding') return;
-    this.explosionState = 'exploding';
-    this.explodeElapsed = 0.0;
-    this.explosionProgress = 0.0;
-    this.targetNavHref = targetHref || null;
-    this.hasNavigated = false;
-    if (targetHref && typeof sessionStorage !== 'undefined') {
-      sessionStorage.setItem('house_should_assemble', '1');
+  public startTransitionTo(targetMode: 'house' | 'ambient', clickTime?: number): void {
+    if (clickTime) {
+      this.lastClickTimestamp = clickTime;
+      this.clickToAnimTimeMs = performance.now() - clickTime;
     }
 
-    if (this.navTimer) clearTimeout(this.navTimer);
-    if (targetHref) {
-      this.navTimer = setTimeout(() => {
-        if (!this.hasNavigated && this.targetNavHref) {
-          this.hasNavigated = true;
-          window.location.href = this.targetNavHref;
-        }
-      }, 1445); // Point 0.85 of 1.7s = 1445ms
+    if (targetMode === 'ambient') {
+      if (this.mode === 'ambient' && this.transitionState === 'idle') return;
+      this.mode = 'ambient';
+      this.transitionState = 'house_to_ambient';
+      this.transitionElapsed = 0.0;
+      this.transitionDuration = 1.1;
+    } else {
+      if (this.mode === 'house' && this.transitionState === 'idle') return;
+      this.mode = 'house';
+      this.transitionState = 'ambient_to_house';
+      this.transitionElapsed = 0.0;
+      this.transitionDuration = 1.4;
+      this.recomputeFittingDist();
     }
   }
 
-  public explodeAndReassemble(): void {
-    if (this.explosionState !== 'idle') return;
-    this.explosionState = 'exploding';
-    this.explodeElapsed = 0.0;
-    this.explosionProgress = 0.0;
-    this.targetNavHref = null;
-    this.hasNavigated = false;
-  }
-
-  public assemble(): void {
-    this.explosionState = 'assembling';
-    this.assembleElapsed = 0.0;
-    this.startAssembleProgress = this.explosionProgress > 0.01 ? this.explosionProgress : 1.0;
-    this.targetNavHref = null;
-    this.hasNavigated = false;
-    this.wasExploded = true;
-  }
-
-  public assembleFromDispersed(): void {
-    this.explosionProgress = 1.0;
-    this.explosionState = 'assembling';
-    this.assembleElapsed = 0.0;
-    this.startAssembleProgress = 1.0;
-    this.targetNavHref = null;
-    this.hasNavigated = false;
-    this.wasExploded = true;
+  public handlePageNav(pathname: string): void {
+    const isHome = pathname === '/' || pathname === '/index.html' || pathname === '';
+    if (isHome) {
+      this.anchorElement = typeof document !== 'undefined' ? document.getElementById('house-anchor') : null;
+      if (this.anchorElement && this.anchorResizeObserver) {
+        this.anchorResizeObserver.observe(this.anchorElement);
+      }
+      this.recomputeFittingDist();
+      if (this.mode !== 'house' && this.transitionState !== 'ambient_to_house') {
+        this.startTransitionTo('house', performance.now());
+      }
+    } else {
+      if (this.mode !== 'ambient' && this.transitionState !== 'house_to_ambient') {
+        this.startTransitionTo('ambient', performance.now());
+      }
+    }
   }
 
   private setupMenuExplodeListener(): void {
-    document.addEventListener('click', (e) => {
-      if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
-
-      const target = (e.target as HTMLElement)?.closest('a');
-      if (!target) return;
-
-      const href = target.getAttribute('href');
-      if (
-        href &&
-        href.startsWith('/') &&
-        !href.startsWith('//') &&
-        target.getAttribute('target') !== '_blank' &&
-        !target.hasAttribute('download')
-      ) {
-        const cleanHref = href.split('?')[0].split('#')[0];
-        const isCurrentHome = (cleanHref === '/' || cleanHref === '/index.html') &&
-          (window.location.pathname === '/' || window.location.pathname === '/index.html' || window.location.pathname === '');
-        if (isCurrentHome) {
-          // Already on home page! Seamlessly explode and reassemble without reloading
-          e.preventDefault();
-          this.explodeAndReassemble();
-          return;
-        }
-        e.preventDefault();
-        this.explode(href);
-      }
-    });
-
-    window.addEventListener('pageshow', (event) => {
-      if (event.persisted) {
-        this.assembleFromDispersed();
-      }
-    });
-
-    if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('house_should_assemble') === '1') {
-      try {
-        sessionStorage.removeItem('house_should_assemble');
-      } catch (err) {}
-      this.assembleFromDispersed();
-    }
+    // Navigation clicks are non-blocking and handled in BaseLayout
   }
 
   private buildDistantStars(isNarrow: boolean): void {
@@ -1876,205 +1880,282 @@ export class HouseOrb {
   }
 
   private updateCubesAnimation(time: number, dt: number): void {
-    if (this.explosionState === 'exploding') {
-      this.explodeElapsed += dt;
-      this.explosionProgress = Math.min(1.0, this.explodeElapsed / 1.4);
-
-      if (this.explosionProgress >= 0.85) {
-        if (this.targetNavHref && !this.hasNavigated) {
-          this.hasNavigated = true;
-          window.location.href = this.targetNavHref;
-        } else if (!this.targetNavHref) {
-          // Interactive in-place explode and reassemble!
-          this.assemble();
-        }
-      }
-    } else if (this.explosionState === 'assembling') {
-      this.assembleElapsed += dt;
-      const progressFraction = Math.min(1.0, this.assembleElapsed / 2.2);
-      const ease = 1.0 - Math.pow(1.0 - progressFraction, 3);
-      this.explosionProgress = Math.max(0.0, this.startAssembleProgress * (1.0 - ease));
-      if (progressFraction >= 1.0) {
-        this.explosionProgress = 0.0;
-        this.explosionState = 'idle';
-      }
-    }
-
-    const p = this.explosionProgress;
-
-    const baseBloomStrength = Math.min(0.30, this.targetBloomStrength);
-    this.bloomPass.strength = baseBloomStrength * (1.0 - 0.85 * smoothstep(0.15, 0.7, p));
-    this.renderer.toneMappingExposure = 0.85;
-
-    // Fade ground disk & window light pools during explosion
-    if (this.groundDiskMaterial?.uniforms?.uFade) {
-      this.groundDiskMaterial.uniforms.uFade.value = p > 0.15 ? Math.max(0.0, 1.0 - (p - 0.15) / 0.30) : 1.0;
-    }
-    if (this.windowSpotMaterial?.uniforms?.uFade) {
-      this.windowSpotMaterial.uniforms.uFade.value = Math.max(0.0, 1.0 - smoothstep(0.15, 0.55, p));
-    }
-
-    if (this.scene.fog && this.scene.fog instanceof THREE.FogExp2) {
-      this.scene.fog.color.copy(this.fogColor);
-      const baseFog = 0.325 / (this.currentDist || 25);
-      const targetFog = baseFog * 2.5;
-      this.scene.fog.density = baseFog + (targetFog - baseFog) * Math.min(1.0, p / 0.85);
-    }
-
-    const emissiveFade = Math.max(0.0, 1.0 - smoothstep(0.15, 0.55, p));
-    if (this.cubeUniforms?.uEmissiveFade) {
-      this.cubeUniforms.uEmissiveFade.value = emissiveFade;
-    }
-
     if (this.innerUniforms?.uTime) {
       this.innerUniforms.uTime.value = time;
     }
 
-    let innerGlowMult = 1.0;
-    if (p <= 0.2) {
-      const a1 = p / 0.2;
-      innerGlowMult = 1.0 + 0.25 * Math.sin(a1 * Math.PI * 0.5);
-    } else if (p < 0.45) {
-      const t = (p - 0.2) / 0.25;
-      innerGlowMult = 1.25 * Math.pow(1.0 - t, 2);
-    } else {
-      innerGlowMult = 0.0;
-    }
+    if (this.transitionState === 'house_to_ambient') {
+      this.transitionElapsed += dt;
+      const tau = Math.min(1.0, this.transitionElapsed / this.transitionDuration);
 
-    if (this.innerUniforms?.uGlowColor) {
-      this.innerUniforms.uGlowColor.value.copy(this.currentGlowColor).multiplyScalar(innerGlowMult);
-    }
-
-    if (this.ringMaterial) {
-      const ringPhase = time * 1.795 - 5.0;
-      const baseWave = 0.5 + 0.5 * Math.sin(ringPhase);
-      let ringOpacity = 0.21 + 0.21 * baseWave; // 40% quieter (0.35 * 0.6 = 0.21)
-      if (p > 0.15) {
-        ringOpacity *= Math.max(0.0, 1.0 - (p - 0.15) / 0.30);
+      // Brightness fades from 1.0 down to 0.15
+      const brightness = 1.0 - (1.0 - 0.15) * Math.min(1.0, tau / 0.85);
+      if (this.cubeUniforms?.uSceneBrightness) {
+        this.cubeUniforms.uSceneBrightness.value = brightness;
       }
-      this.ringMaterial.opacity = ringOpacity;
-    }
 
-    if (p > 0.0001) {
-      this.wasExploded = true;
-      const center = new THREE.Vector3(0, 2.5, 0);
-      const worldCamDir = new THREE.Vector3(14, 9, 22).normalize();
-      const localCamDir = worldCamDir.clone().applyAxisAngle(
-        new THREE.Vector3(0, 1, 0),
-        -this.stage.rotation.y
-      );
+      // Emissive fades out quickly in first 0.25s
+      const emFade = Math.max(0.0, 1.0 - tau / 0.25);
+      if (this.cubeUniforms?.uEmissiveFade) {
+        this.cubeUniforms.uEmissiveFade.value = emFade;
+      }
 
-      const localCamPos = this.camera.position.clone();
-      this.stage.worldToLocal(localCamPos);
+      // Bloom softens
+      this.bloomPass.strength = THREE.MathUtils.lerp(this.targetBloomStrength, this.targetBloomStrength * 0.7, tau);
 
-      const inhaleAmt = p <= 0.2 ? Math.sin((p / 0.2) * Math.PI * 0.5) : 1.0;
-      const camAcc = p > 0.6 ? Math.pow((p - 0.6) / 0.4, 2) * 12.0 : 0.0;
+      // Ground disk & spots fade out
+      const gFade = Math.max(0.0, 1.0 - tau / 0.30);
+      if (this.groundDiskMaterial?.uniforms?.uFade) {
+        this.groundDiskMaterial.uniforms.uFade.value = gFade;
+      }
+      if (this.windowSpotMaterial?.uniforms?.uFade) {
+        this.windowSpotMaterial.uniforms.uFade.value = gFade;
+      }
+      if (this.ringMaterial) {
+        this.ringMaterial.opacity = (0.21 + 0.21 * (0.5 + 0.5 * Math.sin(time * 1.8))) * gFade;
+      }
 
-      // Animate outer bricks & components
+      // Wave dispersal based on distance from center and height
       for (let i = 0; i < this.cubesData.length; i++) {
         const item = this.cubesData[i];
-        const radial = new THREE.Vector3().subVectors(item.basePos, center);
-        const inhaleOffset = radial.multiplyScalar(0.12 * inhaleAmt);
+        const waveDelay = 0.20 * item.distNorm + 0.15 * item.heightNorm;
+        const localT = Math.max(0.0, Math.min(1.0, (this.transitionElapsed - waveDelay) / Math.max(0.01, this.transitionDuration - waveDelay)));
+        const ease = 1.0 - Math.pow(1.0 - localT, 3);
 
-        let disperseOffset = new THREE.Vector3(0, 0, 0);
-        let rotAmount = 0;
-        let scaleDecay = 1.0 + 0.04 * inhaleAmt;
+        if (item.isAmbient) {
+          const dx = Math.sin(time * item.driftFreq!.x + item.driftPhase!.x) * item.driftAmp!.x;
+          const dy = Math.cos(time * item.driftFreq!.y + item.driftPhase!.y) * item.driftAmp!.y;
+          const dz = Math.sin(time * item.driftFreq!.z + item.driftPhase!.z) * item.driftAmp!.z;
+          const targetPos = new THREE.Vector3(
+            item.ambientPos!.x + dx,
+            item.ambientPos!.y + dy,
+            item.ambientPos!.z + dz
+          );
 
-        if (p > 0.2) {
-          const pStart = 0.20 + 0.28 * item.heightNorm + 0.08 * item.distNorm;
-          if (p > pStart) {
-            const tau = Math.min(1.0, (p - pStart) / (0.85 - pStart));
-            const ease = 1.0 - Math.pow(1.0 - tau, 3);
-            disperseOffset.copy(item.dispersionDir).multiplyScalar(ease);
-            rotAmount = tau * 2.2;
-            scaleDecay = Math.max(0.0, (1.0 + 0.04 * inhaleAmt) * (1.0 - ease));
-          }
+          this.dummy.position.lerpVectors(item.basePos, targetPos, ease);
+          this.dummy.rotation.set(
+            item.baseRot.x + item.rotSpeed.x * ease * 2.0,
+            item.baseRot.y + item.rotSpeed.y * ease * 2.0,
+            item.baseRot.z + item.rotSpeed.z * ease * 2.0
+          );
+          this.dummy.scale.lerpVectors(item.baseScale, item.ambientScale!, ease);
+        } else {
+          const disperseOffset = item.dispersionDir.clone().multiplyScalar(ease * 1.8);
+          this.dummy.position.copy(item.basePos).add(disperseOffset);
+          this.dummy.rotation.set(
+            item.baseRot.x + item.rotSpeed.x * ease * 2.5,
+            item.baseRot.y + item.rotSpeed.y * ease * 2.5,
+            item.baseRot.z + item.rotSpeed.z * ease * 2.5
+          );
+          const s = Math.max(0.0, 1.0 - ease);
+          this.dummy.scale.set(item.baseScale.x * s, item.baseScale.y * s, item.baseScale.z * s);
         }
 
-        this.dummy.position.copy(item.basePos)
-          .add(inhaleOffset)
-          .add(disperseOffset)
-          .addScaledVector(localCamDir, camAcc);
-
-        const distToCam = this.dummy.position.distanceTo(localCamPos);
-
-        let proximityScale = 1.0;
-        if (distToCam < 6.0) {
-          proximityScale = Math.max(0.0, Math.min(1.0, (distToCam - 1.5) / 4.5));
-        }
-
-        this.dummy.rotation.set(
-          item.baseRot.x + item.rotSpeed.x * rotAmount,
-          item.baseRot.y + item.rotSpeed.y * rotAmount,
-          item.baseRot.z + item.rotSpeed.z * rotAmount
-        );
-
-        const finalScale = p >= 0.85 ? 0.0 : (scaleDecay * proximityScale);
-        this.dummy.scale.set(
-          item.baseScale.x * finalScale,
-          item.baseScale.y * finalScale,
-          item.baseScale.z * finalScale
-        );
         this.dummy.updateMatrix();
         this.instancedCubes.setMatrixAt(i, this.dummy.matrix);
       }
       this.instancedCubes.instanceMatrix.needsUpdate = true;
 
-      // Animate inner frame cubes
-      let innerScaleDecay = 0.0;
-      if (p <= 0.2) {
-        innerScaleDecay = 1.0 + 0.04 * (p / 0.2);
-      } else if (p < 0.45) {
-        const t = (p - 0.2) / 0.25;
-        innerScaleDecay = 1.04 * Math.pow(1.0 - t, 2);
-      } else {
-        innerScaleDecay = 0.0;
-      }
-
+      // Inner frame fades to 0
+      const innerEase = Math.max(0.0, 1.0 - Math.min(1.0, this.transitionElapsed / 0.35));
       for (let i = 0; i < this.innerCubesData.length; i++) {
         const item = this.innerCubesData[i];
-        const radial = new THREE.Vector3().subVectors(item.basePos, center);
-        const inhaleOffset = radial.multiplyScalar(0.12 * inhaleAmt);
-
-        let disperseOffset = new THREE.Vector3(0, 0, 0);
-        let rotAmount = 0;
-
-        if (p > 0.2 && p < 0.45) {
-          const pStart = 0.20 + 0.28 * item.heightNorm + 0.08 * item.distNorm;
-          if (p > pStart) {
-            const tau = Math.min(1.0, (p - pStart) / (1.0 - pStart));
-            const ease = 1.0 - Math.pow(1.0 - tau, 3);
-            disperseOffset.copy(item.dispersionDir).multiplyScalar(ease);
-            rotAmount = tau * 2.2;
-          }
-        }
-
-        this.dummy.position.copy(item.basePos)
-          .add(inhaleOffset)
-          .add(disperseOffset)
-          .addScaledVector(localCamDir, camAcc);
-
-        this.dummy.rotation.set(
-          item.baseRot.x + item.rotSpeed.x * rotAmount,
-          item.baseRot.y + item.rotSpeed.y * rotAmount,
-          item.baseRot.z + item.rotSpeed.z * rotAmount
-        );
-
-        this.dummy.scale.set(
-          item.baseScale.x * innerScaleDecay,
-          item.baseScale.y * innerScaleDecay,
-          item.baseScale.z * innerScaleDecay
-        );
+        this.dummy.position.copy(item.basePos);
+        this.dummy.rotation.set(item.baseRot.x, item.baseRot.y, item.baseRot.z);
+        this.dummy.scale.set(item.baseScale.x * innerEase, item.baseScale.y * innerEase, item.baseScale.z * innerEase);
         this.dummy.updateMatrix();
         this.innerInstancedCubes.setMatrixAt(i, this.dummy.matrix);
       }
       this.innerInstancedCubes.instanceMatrix.needsUpdate = true;
+
+      if (tau >= 1.0) {
+        this.transitionState = 'idle';
+      }
+    } else if (this.transitionState === 'ambient_to_house') {
+      this.transitionElapsed += dt;
+      const tau = Math.min(1.0, this.transitionElapsed / this.transitionDuration);
+
+      // Brightness rises from 0.15 up to 1.0
+      const brightness = 0.15 + (1.0 - 0.15) * Math.min(1.0, tau / 0.85);
+      if (this.cubeUniforms?.uSceneBrightness) {
+        this.cubeUniforms.uSceneBrightness.value = brightness;
+      }
+
+      // Windows emissive lights up last (from tau = 0.82 to 1.0)
+      const emFade = Math.max(0.0, Math.min(1.0, (tau - 0.82) / 0.18));
+      if (this.cubeUniforms?.uEmissiveFade) {
+        this.cubeUniforms.uEmissiveFade.value = emFade;
+      }
+
+      // Ground disk & ring fade in over tau in [0.65, 1.0]
+      const groundFade = Math.max(0.0, Math.min(1.0, (tau - 0.65) / 0.35));
+      if (this.groundDiskMaterial?.uniforms?.uFade) {
+        this.groundDiskMaterial.uniforms.uFade.value = groundFade;
+      }
+      if (this.windowSpotMaterial?.uniforms?.uFade) {
+        this.windowSpotMaterial.uniforms.uFade.value = emFade;
+      }
+      if (this.ringMaterial) {
+        this.ringMaterial.opacity = (0.21 + 0.21 * (0.5 + 0.5 * Math.sin(time * 1.8))) * groundFade;
+      }
+
+      // Staged assembly by layer:
+      for (let i = 0; i < this.cubesData.length; i++) {
+        const item = this.cubesData[i];
+        let tStart = 0.05;
+        let tEnd = 0.45;
+
+        switch (item.type) {
+          case 'base':
+            tStart = 0.05;
+            tEnd = 0.45;
+            break;
+          case 'wall':
+            tStart = 0.15 + item.heightNorm * 0.42;
+            tEnd = tStart + 0.32;
+            break;
+          case 'trim':
+          case 'door':
+            tStart = 0.28 + item.heightNorm * 0.35;
+            tEnd = tStart + 0.30;
+            break;
+          case 'window':
+            tStart = 0.40 + item.heightNorm * 0.35;
+            tEnd = tStart + 0.32;
+            break;
+          case 'chimney_rim':
+            tStart = 0.70;
+            tEnd = 0.98;
+            break;
+          case 'roof':
+            tStart = 0.68 + (item.basePos.y > 4.5 ? 0.15 : 0.0);
+            tEnd = Math.min(1.30, tStart + 0.35);
+            break;
+          default:
+            tStart = 0.20;
+            tEnd = 0.60;
+            break;
+        }
+
+        const localT = Math.max(0.0, Math.min(1.0, (this.transitionElapsed - tStart) / (tEnd - tStart)));
+        const ease = 1.0 - Math.pow(1.0 - localT, 3);
+
+        if (item.isAmbient) {
+          const dx = Math.sin(time * item.driftFreq!.x + item.driftPhase!.x) * item.driftAmp!.x;
+          const dy = Math.cos(time * item.driftFreq!.y + item.driftPhase!.y) * item.driftAmp!.y;
+          const dz = Math.sin(time * item.driftFreq!.z + item.driftPhase!.z) * item.driftAmp!.z;
+          const curAmbientPos = new THREE.Vector3(
+            item.ambientPos!.x + dx,
+            item.ambientPos!.y + dy,
+            item.ambientPos!.z + dz
+          );
+
+          this.dummy.position.lerpVectors(curAmbientPos, item.basePos, ease);
+          this.dummy.rotation.set(
+            THREE.MathUtils.lerp(item.baseRot.x + item.rotSpeed.x * 2.0, item.baseRot.x, ease),
+            THREE.MathUtils.lerp(item.baseRot.y + item.rotSpeed.y * 2.0, item.baseRot.y, ease),
+            THREE.MathUtils.lerp(item.baseRot.z + item.rotSpeed.z * 2.0, item.baseRot.z, ease)
+          );
+          this.dummy.scale.lerpVectors(item.ambientScale!, item.baseScale, ease);
+        } else {
+          const reverseOffset = item.dispersionDir.clone().multiplyScalar((1.0 - ease) * 1.8);
+          this.dummy.position.copy(item.basePos).add(reverseOffset);
+          this.dummy.rotation.set(
+            THREE.MathUtils.lerp(item.baseRot.x + item.rotSpeed.x * 2.5, item.baseRot.x, ease),
+            THREE.MathUtils.lerp(item.baseRot.y + item.rotSpeed.y * 2.5, item.baseRot.y, ease),
+            THREE.MathUtils.lerp(item.baseRot.z + item.rotSpeed.z * 2.5, item.baseRot.z, ease)
+          );
+          this.dummy.scale.set(item.baseScale.x * ease, item.baseScale.y * ease, item.baseScale.z * ease);
+        }
+
+        this.dummy.updateMatrix();
+        this.instancedCubes.setMatrixAt(i, this.dummy.matrix);
+      }
+      this.instancedCubes.instanceMatrix.needsUpdate = true;
+
+      // Inner frame fades in
+      const innerEase = Math.max(0.0, Math.min(1.0, (this.transitionElapsed - 0.4) / 0.6));
+      for (let i = 0; i < this.innerCubesData.length; i++) {
+        const item = this.innerCubesData[i];
+        this.dummy.position.copy(item.basePos);
+        this.dummy.rotation.set(item.baseRot.x, item.baseRot.y, item.baseRot.z);
+        this.dummy.scale.set(item.baseScale.x * innerEase, item.baseScale.y * innerEase, item.baseScale.z * innerEase);
+        this.dummy.updateMatrix();
+        this.innerInstancedCubes.setMatrixAt(i, this.dummy.matrix);
+      }
+      this.innerInstancedCubes.instanceMatrix.needsUpdate = true;
+
+      if (tau >= 1.0) {
+        this.transitionState = 'idle';
+      }
+    } else if (this.mode === 'ambient') {
+      // Idle ambient mode:
+      if (this.cubeUniforms?.uSceneBrightness) {
+        this.cubeUniforms.uSceneBrightness.value = 0.15;
+      }
+      if (this.cubeUniforms?.uEmissiveFade) {
+        this.cubeUniforms.uEmissiveFade.value = 0.0;
+      }
+      if (this.groundDiskMaterial?.uniforms?.uFade) {
+        this.groundDiskMaterial.uniforms.uFade.value = 0.0;
+      }
+      if (this.windowSpotMaterial?.uniforms?.uFade) {
+        this.windowSpotMaterial.uniforms.uFade.value = 0.0;
+      }
+      if (this.ringMaterial) {
+        this.ringMaterial.opacity = 0.0;
+      }
+
+      // Drift ambient particles
+      for (let i = 0; i < this.cubesData.length; i++) {
+        const item = this.cubesData[i];
+        if (item.isAmbient) {
+          const driftX = Math.sin(time * item.driftFreq!.x + item.driftPhase!.x) * item.driftAmp!.x;
+          const driftY = Math.cos(time * item.driftFreq!.y + item.driftPhase!.y) * item.driftAmp!.y;
+          const driftZ = Math.sin(time * item.driftFreq!.z + item.driftPhase!.z) * item.driftAmp!.z;
+
+          this.dummy.position.set(
+            item.ambientPos!.x + driftX,
+            item.ambientPos!.y + driftY,
+            item.ambientPos!.z + driftZ
+          );
+          this.dummy.rotation.set(
+            item.baseRot.x + time * item.rotSpeed.x * 0.2,
+            item.baseRot.y + time * item.rotSpeed.y * 0.2,
+            item.baseRot.z + time * item.rotSpeed.z * 0.2
+          );
+          this.dummy.scale.copy(item.ambientScale!);
+        } else {
+          this.dummy.scale.set(0, 0, 0);
+        }
+        this.dummy.updateMatrix();
+        this.instancedCubes.setMatrixAt(i, this.dummy.matrix);
+      }
+      this.instancedCubes.instanceMatrix.needsUpdate = true;
     } else {
-      if (this.wasExploded) {
-        this.wasExploded = false;
+      // Idle house mode:
+      if (this.cubeUniforms?.uSceneBrightness) {
+        this.cubeUniforms.uSceneBrightness.value = 1.0;
+      }
+      if (this.cubeUniforms?.uEmissiveFade) {
+        this.cubeUniforms.uEmissiveFade.value = 1.0;
+      }
+      if (this.groundDiskMaterial?.uniforms?.uFade) {
+        this.groundDiskMaterial.uniforms.uFade.value = 1.0;
+      }
+      if (this.windowSpotMaterial?.uniforms?.uFade) {
+        this.windowSpotMaterial.uniforms.uFade.value = 1.0;
+      }
+      if (this.ringMaterial) {
+        this.ringMaterial.opacity = 0.21 + 0.21 * (0.5 + 0.5 * Math.sin(time * 1.8));
+      }
+
+      if (this.wasMatrixDirty) {
+        this.wasMatrixDirty = false;
         this.resetCubesToIdle();
       }
-      // Idle micro-breathing pulse when fully assembled
+
+      // Idle micro-breathing pulse
       const breathe = Math.sin(time * 1.8) * 0.015;
       this.stage.scale.set(1.0 + breathe, 1.0 + breathe, 1.0 + breathe);
     }
@@ -2415,12 +2496,15 @@ export class HouseOrb {
 
     this.debugInfoPanel.innerHTML = `
       <div style="font-weight: bold; color: #fff; margin-bottom: 4px;">🔧 HouseOrb Debug (?debug=1)</div>
+      <div>Click-to-anim: <b style="color: ${this.clickToAnimTimeMs <= 100 ? '#22c55e' : '#ef4444'};">${this.clickToAnimTimeMs.toFixed(1)}ms</b> (target &le; 100ms)</div>
+      <div>Mode: <b style="color: #fff;">${this.mode} (${this.transitionState})</b> | click: ${this.lastClickTimestamp > 0 ? (performance.now() - this.lastClickTimestamp).toFixed(0) + 'ms ago' : 'none'}</div>
       <div>W×H: <b style="color: #fff;">${W}×${H}</b></div>
       <div>rectW×rectH: <b style="color: #fff;">${rect.width.toFixed(1)}×${rect.height.toFixed(1)}</b></div>
       <div>cx, cy: <b style="color: #fff;">${cx.toFixed(1)}, ${cy.toFixed(1)}</b></div>
       <div>offsetX/offsetY: <b style="color: #fff;">${offsetX.toFixed(1)} / ${offsetY.toFixed(1)}</b></div>
       <div>dist: <b style="color: #fff;">${dist.toFixed(2)}</b></div>
       <div>scrollY: <b style="color: #fff;">${Math.round(scrollY)}px</b></div>
+      <div>turntable: <b style="color: #fff;">${(this.turntableAngle % (Math.PI * 2)).toFixed(2)} rad</b></div>
       <div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed rgba(255,255,255,0.2);">
         min margin: <b style="color: ${minMargin >= 6.0 ? '#22c55e' : '#ef4444'};">${minMargin.toFixed(1)}%</b>
         <span style="font-size: 11px; opacity: 0.8;">(L:${leftMargin.toFixed(0)}% R:${rightMargin.toFixed(0)}% T:${topMargin.toFixed(0)}% B:${bottomMargin.toFixed(0)}%)</span>
@@ -2428,91 +2512,128 @@ export class HouseOrb {
     `;
   }
 
-  private updateAnchorProjection(time: number): void {
+  private updateAnchorProjection(_time: number, dt: number): void {
+    // Continuously accumulate turntable angle - NEVER resets to 0 across page transitions!
+    this.turntableAngle += 0.14 * dt;
+
     if (!this.anchorElement && typeof document !== 'undefined') {
       this.anchorElement = document.getElementById('house-anchor');
     }
 
     const W = window.innerWidth;
     const H = window.innerHeight;
+    const isTouchOrReduced = this.isTouchDevice || this.prefersReducedMotion;
+    const pmX = isTouchOrReduced ? 0.0 : this.mouse.x;
+    const pmY = isTouchOrReduced ? 0.0 : this.mouse.y;
 
-    if (this.anchorElement && W > 0 && H > 0) {
-      const rect = this.anchorElement.getBoundingClientRect();
-      const rectW = Math.max(1, rect.width);
-      const rectH = Math.max(1, rect.height);
-      const cx = rect.left + rectW / 2;
-      const cy = rect.top + rectH / 2;
+    if (this.mode === 'house' || this.transitionState === 'ambient_to_house') {
+      if (this.anchorElement && W > 0 && H > 0) {
+        const rect = this.anchorElement.getBoundingClientRect();
+        const rectW = Math.max(1, rect.width);
+        const rectH = Math.max(1, rect.height);
+        const cx = rect.left + rectW / 2;
+        const cy = rect.top + rectH / 2;
 
-      // Check if anchor is completely off-screen
-      const isOffscreen = rect.bottom <= 0 || rect.top >= H || rect.right <= 0 || rect.left >= W;
-      if (isOffscreen) {
-        this.stage.visible = false;
-        if (this.isDebug) {
-          this.updateDebugOverlay(rect, null, W, H, cx, cy, window.scrollY, 0, 0, this.fittingDist, true);
+        const isOffscreen = rect.bottom <= 0 || rect.top >= H || rect.right <= 0 || rect.left >= W;
+        if (isOffscreen) {
+          this.stage.visible = false;
+          if (this.isDebug) {
+            this.updateDebugOverlay(rect, null, W, H, cx, cy, window.scrollY, 0, 0, this.fittingDist, true);
+          }
+          return;
         }
-        return;
+
+        this.stage.visible = true;
+
+        const offsetX = -(cx - W / 2);
+        const offsetY = -(cy - H / 2);
+
+        if (this.transitionState === 'ambient_to_house') {
+          const tau = Math.min(1.0, this.transitionElapsed / this.transitionDuration);
+          const ease = 1.0 - Math.pow(1.0 - tau, 3);
+          this.camera.setViewOffset(W, H, offsetX * ease, offsetY * ease, W, H);
+        } else {
+          this.camera.setViewOffset(W, H, offsetX, offsetY, W, H);
+        }
+
+        const dist = this.fittingDist;
+        this.currentDist = dist;
+
+        const elevationAngle = THREE.MathUtils.degToRad(this.cameraElevation);
+        const dXZ = dist * Math.cos(elevationAngle);
+        const viewAngle = THREE.MathUtils.degToRad(this.cameraAzimuth);
+        const targetY = this.houseBoxCenter.y + this.cameraLookAtY;
+
+        const camX = dXZ * Math.sin(viewAngle) + pmX * 0.35;
+        const camZ = dXZ * Math.cos(viewAngle);
+        const camY = (targetY + dXZ * Math.tan(elevationAngle)) + pmY * 0.25;
+
+        this.camera.fov = this.cameraFov;
+        this.camera.position.set(camX, camY, camZ);
+        this.camera.up.set(0, 1, 0);
+        this.camera.lookAt(0, targetY, 0);
+        this.camera.updateProjectionMatrix();
+
+        this.stage.rotation.y = this.turntableAngle + pmX * 0.35;
+        this.stage.rotation.x = 0;
+        this.stage.rotation.z = 0;
+        this.stage.position.set(0, 0, 0);
+        this.stage.updateMatrixWorld(true);
+
+        if (this.scene.fog && this.scene.fog instanceof THREE.FogExp2) {
+          this.scene.fog.density = 0.325 / Math.max(1, this.currentDist);
+        }
+
+        if (this.isDebug) {
+          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+          const tempV = new THREE.Vector3();
+          for (const corner of this.houseCorners) {
+            tempV.copy(corner).applyMatrix4(this.stage.matrixWorld).project(this.camera);
+            const px = (tempV.x * 0.5 + 0.5) * W;
+            const py = (-tempV.y * 0.5 + 0.5) * H;
+            if (px < minX) minX = px;
+            if (px > maxX) maxX = px;
+            if (py < minY) minY = py;
+            if (py > maxY) maxY = py;
+          }
+          const houseProj = { minX, maxX, minY, maxY, width: maxX - minX, height: maxY - minY };
+          this.updateDebugOverlay(rect, houseProj, W, H, cx, cy, window.scrollY, offsetX, offsetY, dist, false);
+        }
+      }
+    } else {
+      // Ambient mode (or house_to_ambient)
+      this.stage.visible = true;
+      if (this.transitionState === 'house_to_ambient') {
+        const tau = Math.min(1.0, this.transitionElapsed / this.transitionDuration);
+        const ease = Math.pow(tau, 2);
+        if (this.anchorElement) {
+          const rect = this.anchorElement.getBoundingClientRect();
+          const cx = rect.left + Math.max(1, rect.width) / 2;
+          const cy = rect.top + Math.max(1, rect.height) / 2;
+          const offsetX = -(cx - W / 2) * (1.0 - ease);
+          const offsetY = -(cy - H / 2) * (1.0 - ease);
+          this.camera.setViewOffset(W, H, offsetX, offsetY, W, H);
+        } else {
+          this.camera.clearViewOffset();
+        }
+      } else {
+        this.camera.clearViewOffset();
       }
 
-      this.stage.visible = true;
-
-      // 1. Position update EVERY frame from getBoundingClientRect()
-      const offsetX = -(cx - W / 2);
-      const offsetY = -(cy - H / 2);
-      this.camera.setViewOffset(W, H, offsetX, offsetY, W, H);
-
-      // 2. Camera position with fittingDist & angle facing roof
-      const dist = this.fittingDist;
-      this.currentDist = dist;
-
-      const elevationAngle = THREE.MathUtils.degToRad(this.cameraElevation);
-      const dXZ = dist * Math.cos(elevationAngle);
-      const viewAngle = THREE.MathUtils.degToRad(this.cameraAzimuth);
-      const targetY = this.houseBoxCenter.y + this.cameraLookAtY;
-
-      const isTouchOrReduced = this.isTouchDevice || this.prefersReducedMotion;
-      const pmX = isTouchOrReduced ? 0.0 : this.mouse.x;
-      const pmY = isTouchOrReduced ? 0.0 : this.mouse.y;
-
-      const camX = dXZ * Math.sin(viewAngle) + pmX * 0.35;
-      const camZ = dXZ * Math.cos(viewAngle);
-      const camY = (targetY + dXZ * Math.tan(elevationAngle)) + pmY * 0.25;
-
-      this.camera.fov = this.cameraFov;
-      this.camera.position.set(camX, camY, camZ);
+      this.camera.fov = 32;
+      this.camera.position.set(pmX * 0.5, 3.0 + pmY * 0.3, 24);
       this.camera.up.set(0, 1, 0);
-
-      // Point at house center (elevation angle above horizon)
-      this.camera.lookAt(0, targetY, 0);
+      this.camera.lookAt(0, 2, 0);
       this.camera.updateProjectionMatrix();
 
-      // 3. Stage rotation around Y only (no roll/cren)
-      const baseSpeed = 0.14; // ~45s per full revolution
-      this.stage.rotation.y = time * baseSpeed + pmX * 0.35;
+      this.stage.rotation.y = this.turntableAngle;
       this.stage.rotation.x = 0;
       this.stage.rotation.z = 0;
       this.stage.position.set(0, 0, 0);
       this.stage.updateMatrixWorld(true);
 
-      // Fog density inversely proportional to distance
       if (this.scene.fog && this.scene.fog instanceof THREE.FogExp2) {
-        this.scene.fog.density = 0.325 / Math.max(1, this.currentDist);
-      }
-
-      // 4. Update debug overlay in ?debug=1
-      if (this.isDebug) {
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        const tempV = new THREE.Vector3();
-        for (const corner of this.houseCorners) {
-          tempV.copy(corner).applyMatrix4(this.stage.matrixWorld).project(this.camera);
-          const px = (tempV.x * 0.5 + 0.5) * W;
-          const py = (-tempV.y * 0.5 + 0.5) * H;
-          if (px < minX) minX = px;
-          if (px > maxX) maxX = px;
-          if (py < minY) minY = py;
-          if (py > maxY) maxY = py;
-        }
-        const houseProj = { minX, maxX, minY, maxY, width: maxX - minX, height: maxY - minY };
-        this.updateDebugOverlay(rect, houseProj, W, H, cx, cy, window.scrollY, offsetX, offsetY, dist, false);
+        this.scene.fog.density = 0.015;
       }
     }
   }
@@ -2522,7 +2643,7 @@ export class HouseOrb {
     const height = window.innerHeight;
     if (width > 0 && height > 0) {
       const isNarrow = width < 900;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2.0);
+      const dpr = this.mode === 'ambient' ? 1.0 : Math.min(window.devicePixelRatio || 1, 2.0);
       this.camera.aspect = width / height;
       this.camera.updateProjectionMatrix();
 
@@ -2574,16 +2695,48 @@ export class HouseOrb {
     if (this.isDestroyed) return;
 
     this.animationFrameId = requestAnimationFrame(this.animate);
-    if (this.isPaused) return;
+    if (this.isPaused || document.hidden) return;
 
     const now = performance.now();
+
+    // Mode-specific frame rate & device optimization
+    if (this.mode === 'ambient' && this.transitionState === 'idle') {
+      // Weak device or reduced motion: pause 3D loop and hide canvas (CSS background handles glow)
+      if (this.isWeakDevice || this.prefersReducedMotion) {
+        if (this.renderer.domElement.style.display !== 'none') {
+          this.renderer.domElement.style.display = 'none';
+        }
+        return;
+      }
+      // Cap ambient mode to <= 30 fps (at least 32.5ms between frames)
+      if (now - this.lastAmbientRenderTime < 32.5) {
+        return;
+      }
+      this.lastAmbientRenderTime = now;
+
+      // Clamp DPR to 1.0 in ambient mode
+      if (this.renderer.getPixelRatio() !== 1.0) {
+        this.renderer.setPixelRatio(1.0);
+        this.composer.setPixelRatio(1.0);
+      }
+    } else {
+      if (this.renderer.domElement.style.display === 'none') {
+        this.renderer.domElement.style.display = 'block';
+      }
+      const maxDpr = Math.min(window.devicePixelRatio || 1, 2.0);
+      if (this.renderer.getPixelRatio() !== maxDpr) {
+        this.renderer.setPixelRatio(maxDpr);
+        this.composer.setPixelRatio(maxDpr);
+      }
+    }
+
     if (this.lastFrameTime === 0) {
       this.lastFrameTime = now;
     }
     const rawDt = (now - this.lastFrameTime) * 0.001;
     this.lastFrameTime = now;
 
-    // Strict clamp dt <= 1/20 s (0.05s) to prevent compilation/GC freezes from eating intro or assembly animation
+    // Strict clamp dt <= 1/20 s (0.05s) to prevent compilation/GC freezes from eating animations
     const dt = Math.min(Math.max(0, rawDt), 1.0 / 20.0);
     this.timelineTime += dt;
     const time = this.timelineTime;
@@ -2597,7 +2750,7 @@ export class HouseOrb {
 
     // Update camera anchor projection every frame:
     // reads anchor getBoundingClientRect(), sets camera.setViewOffset and dist, camera looks at center, camera.up=(0,1,0), stage rotates around Y only (no roll/cren)
-    this.updateAnchorProjection(time);
+    this.updateAnchorProjection(time, dt);
 
     const isTouchOrReduced = this.isTouchDevice || this.prefersReducedMotion;
     const pmX = isTouchOrReduced ? 0.0 : this.mouse.x;
@@ -2628,39 +2781,16 @@ export class HouseOrb {
     // Render with post-processing (UnrealBloomPass)
     this.composer.render();
 
-    // After first real rendered frame on GPU, smoothly fade out or immediately remove the initial poster
     if (!this.hasRenderedFirstFrame) {
       this.hasRenderedFirstFrame = true;
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('house-scene-ready'));
-      }
-      const poster = document.getElementById('house-poster');
-      if (poster) {
-        if (this.explosionState === 'assembling') {
-          // Reassembling from dispersed blocks: hide poster immediately so assembly is 100% visible
-          poster.style.display = 'none';
-          if (poster.parentNode) {
-            poster.parentNode.removeChild(poster);
-          }
-        } else {
-          poster.style.transition = 'opacity 0.4s ease-out';
-          poster.style.opacity = '0';
-          setTimeout(() => {
-            if (poster && poster.parentNode) {
-              poster.parentNode.removeChild(poster);
-            }
-          }, 450);
-        }
       }
     }
   };
 
   public destroy(): void {
     this.isDestroyed = true;
-    if (this.navTimer) {
-      clearTimeout(this.navTimer);
-      this.navTimer = null;
-    }
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
     }
@@ -2689,8 +2819,6 @@ export class HouseOrb {
         if (obj.geometry) obj.geometry.dispose();
       }
     });
-
-
 
     if (this.starsMesh) {
       this.starsMesh.geometry.dispose();
@@ -2722,5 +2850,37 @@ export class HouseOrb {
     if (this.renderer.domElement && this.renderer.domElement.parentNode) {
       this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
     }
+  }
+}
+
+// Global Singleton Scene Instance & API
+let globalSceneInstance: HouseOrb | null = null;
+
+export function initGlobalScene(): HouseOrb | null {
+  if (typeof window === 'undefined') return null;
+  if (globalSceneInstance && !globalSceneInstance.isDestroyed) {
+    return globalSceneInstance;
+  }
+  const container = document.getElementById('scene-root');
+  if (!container) return null;
+
+  globalSceneInstance = new HouseOrb({ container });
+  (window as any).__houseOrb = globalSceneInstance;
+  return globalSceneInstance;
+}
+
+export function getHouseOrb(): HouseOrb | null {
+  return globalSceneInstance;
+}
+
+export function onPageLoadNav(pathname: string): void {
+  if (globalSceneInstance) {
+    globalSceneInstance.handlePageNav(pathname);
+  }
+}
+
+export function startSceneTransition(targetMode: 'house' | 'ambient', clickTime: number): void {
+  if (globalSceneInstance) {
+    globalSceneInstance.startTransitionTo(targetMode, clickTime);
   }
 }

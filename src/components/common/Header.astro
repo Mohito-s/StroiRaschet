@@ -145,62 +145,63 @@ const currentPath = Astro.url.pathname;
 </header>
 
 <script>
-  // Clean client-side toggle without framework overhead
-  const btn = document.getElementById('mobile-menu-toggle');
-  const menu = document.getElementById('mobile-menu');
-  const burgerIcon = document.getElementById('burger-icon');
-  const closeIcon = document.getElementById('close-icon');
+  function initHeader() {
+    // Clean client-side toggle without framework overhead
+    const btn = document.getElementById('mobile-menu-toggle');
+    const menu = document.getElementById('mobile-menu');
+    const burgerIcon = document.getElementById('burger-icon');
+    const closeIcon = document.getElementById('close-icon');
 
-  if (btn && menu && burgerIcon && closeIcon) {
-    btn.addEventListener('click', () => {
-      const isExpanded = btn.getAttribute('aria-expanded') === 'true';
-      btn.setAttribute('aria-expanded', String(!isExpanded));
-      menu.classList.toggle('hidden');
-      burgerIcon.classList.toggle('hidden');
-      closeIcon.classList.toggle('hidden');
-    });
-  }
-
-  // Mobile Theme Switcher logic
-  const mobileThemeBtns = document.querySelectorAll<HTMLButtonElement>('[data-mobile-theme-id]');
-  const mobileThemeLabel = document.getElementById('mobile-current-theme-name');
-
-  function syncMobileThemeUI(themeId: string) {
-    if (mobileThemeLabel) {
-      const matchingBtn = document.querySelector<HTMLButtonElement>(`[data-mobile-theme-id="${themeId}"]`);
-      if (matchingBtn) {
-        mobileThemeLabel.textContent = matchingBtn.querySelector('span.truncate')?.textContent || themeId;
-      }
+    if (btn && menu && burgerIcon && closeIcon) {
+      btn.onclick = () => {
+        const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', String(!isExpanded));
+        menu.classList.toggle('hidden');
+        burgerIcon.classList.toggle('hidden');
+        closeIcon.classList.toggle('hidden');
+      };
     }
-    mobileThemeBtns.forEach((b) => {
-      const isCurrent = b.getAttribute('data-mobile-theme-id') === themeId;
-      if (isCurrent) {
-        b.classList.add('border-[var(--accent)]', 'bg-[var(--accent)]/15');
-      } else {
-        b.classList.remove('border-[var(--accent)]', 'bg-[var(--accent)]/15');
+
+    // Mobile Theme Switcher logic
+    const mobileThemeBtns = document.querySelectorAll<HTMLButtonElement>('[data-mobile-theme-id]');
+    const mobileThemeLabel = document.getElementById('mobile-current-theme-name');
+
+    function syncMobileThemeUI(themeId: string) {
+      if (mobileThemeLabel) {
+        const matchingBtn = document.querySelector<HTMLButtonElement>(`[data-mobile-theme-id="${themeId}"]`);
+        if (matchingBtn) {
+          mobileThemeLabel.textContent = matchingBtn.querySelector('span.truncate')?.textContent || themeId;
+        }
       }
+      mobileThemeBtns.forEach((b) => {
+        const isCurrent = b.getAttribute('data-mobile-theme-id') === themeId;
+        if (isCurrent) {
+          b.classList.add('border-[var(--accent)]', 'bg-[var(--accent)]/15');
+        } else {
+          b.classList.remove('border-[var(--accent)]', 'bg-[var(--accent)]/15');
+        }
+      });
+    }
+
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'neon';
+    syncMobileThemeUI(currentTheme);
+
+    mobileThemeBtns.forEach((b) => {
+      b.onclick = () => {
+        const themeId = b.getAttribute('data-mobile-theme-id');
+        if (!themeId) return;
+
+        document.documentElement.setAttribute('data-theme', themeId);
+        try {
+          localStorage.setItem('stroicalc_theme', themeId);
+        } catch {}
+
+        syncMobileThemeUI(themeId);
+        window.dispatchEvent(new CustomEvent('theme-change', { detail: { theme: themeId } }));
+      };
     });
   }
 
-  const currentTheme = document.documentElement.getAttribute('data-theme') || 'neon';
-  syncMobileThemeUI(currentTheme);
-
-  mobileThemeBtns.forEach((b) => {
-    b.addEventListener('click', () => {
-      const themeId = b.getAttribute('data-mobile-theme-id');
-      if (!themeId) return;
-
-      document.documentElement.setAttribute('data-theme', themeId);
-      try {
-        localStorage.setItem('stroicalc_theme', themeId);
-      } catch {}
-
-      syncMobileThemeUI(themeId);
-      window.dispatchEvent(new CustomEvent('theme-change', { detail: { theme: themeId } }));
-    });
-  });
-
-  window.addEventListener('theme-change', (e: any) => {
-    if (e.detail?.theme) syncMobileThemeUI(e.detail.theme);
-  });
+  // Initialize on Astro page load
+  document.addEventListener('astro:page-load', initHeader);
 </script>

@@ -35,47 +35,47 @@ import { YANDEX_METRIKA_ID } from '../../config/site';
 </div>
 
 <script define:vars={{ metrikaId: YANDEX_METRIKA_ID }}>
-  // Check localStorage and show banner if not accepted
-  const banner = document.getElementById('cookie-banner');
-  const btn = document.getElementById('accept-cookie-btn');
+  function initCookieBanner() {
+    const banner = document.getElementById('cookie-banner');
+    const btn = document.getElementById('accept-cookie-btn');
 
-  function initMetrika() {
-    if (!metrikaId || window.__metrika_loaded) return;
-    window.__metrika_loaded = true;
+    function initMetrika() {
+      if (!metrikaId || window.__metrika_loaded) return;
+      window.__metrika_loaded = true;
 
-    // Lazy load Yandex Metrika with zero webvisor/session recordings
-    (function(m,e,t,r,i,k,a){
-      m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
-      m[i].l=1*new Date();
-      for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
-      k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
-    })(window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+      (function(m,e,t,r,i,k,a){
+        m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+        m[i].l=1*new Date();
+        for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+        k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+      })(window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
 
-    ym(metrikaId, "init", {
-      clickmap: true,
-      trackLinks: true,
-      accurateTrackBounce: true,
-      webvisor: false // Строго выключен согласно правилам приватности
-    });
+      ym(metrikaId, "init", {
+        clickmap: true,
+        trackLinks: true,
+        accurateTrackBounce: true,
+        webvisor: false
+      });
+    }
+
+    if (localStorage.getItem('cookieAccepted') === '1') {
+      setTimeout(initMetrika, 3000);
+    } else {
+      setTimeout(() => {
+        if (banner) {
+          banner.classList.remove('translate-y-32', 'opacity-0', 'pointer-events-none');
+        }
+      }, 1000);
+    }
+
+    if (btn && banner) {
+      btn.onclick = () => {
+        localStorage.setItem('cookieAccepted', '1');
+        banner.classList.add('translate-y-32', 'opacity-0', 'pointer-events-none');
+        initMetrika();
+      };
+    }
   }
 
-  if (localStorage.getItem('cookieAccepted') === '1') {
-    // Already accepted, lazy load analytics 3s after load or user interaction
-    setTimeout(initMetrika, 3000);
-  } else {
-    // Show banner after 1s
-    setTimeout(() => {
-      if (banner) {
-        banner.classList.remove('translate-y-32', 'opacity-0', 'pointer-events-none');
-      }
-    }, 1000);
-  }
-
-  if (btn && banner) {
-    btn.addEventListener('click', () => {
-      localStorage.setItem('cookieAccepted', '1');
-      banner.classList.add('translate-y-32', 'opacity-0', 'pointer-events-none');
-      initMetrika();
-    });
-  }
+  document.addEventListener('astro:page-load', initCookieBanner);
 </script>

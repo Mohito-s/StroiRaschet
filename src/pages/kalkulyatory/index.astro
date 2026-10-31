@@ -356,84 +356,87 @@ const categories = [
 </BaseLayout>
 
 <script>
-  // Fast client-side search and category filtering
-  const searchInput = document.getElementById('catalog-search') as HTMLInputElement;
-  const chips = document.querySelectorAll<HTMLButtonElement>('.filter-chip');
-  const sections = document.querySelectorAll<HTMLElement>('.category-section');
-  const noResults = document.getElementById('no-search-results');
+  function initCatalogFilters() {
+    const searchInput = document.getElementById('catalog-search') as HTMLInputElement;
+    const chips = document.querySelectorAll<HTMLButtonElement>('.filter-chip');
+    const sections = document.querySelectorAll<HTMLElement>('.category-section');
+    const noResults = document.getElementById('no-search-results');
 
-  let activeCategory = 'all';
-  let searchQuery = '';
+    let activeCategory = 'all';
+    let searchQuery = '';
 
-  function filterCards() {
-    let totalVisible = 0;
+    function filterCards() {
+      let totalVisible = 0;
 
-    sections.forEach((section) => {
-      const sectionCat = section.getAttribute('data-category');
-      const matchesCategory = activeCategory === 'all' || activeCategory === sectionCat;
+      sections.forEach((section) => {
+        const sectionCat = section.getAttribute('data-category');
+        const matchesCategory = activeCategory === 'all' || activeCategory === sectionCat;
 
-      if (!matchesCategory) {
-        section.classList.add('hidden');
-        return;
-      }
+        if (!matchesCategory) {
+          section.classList.add('hidden');
+          return;
+        }
 
-      const cards = section.querySelectorAll<HTMLElement>('.calc-card');
-      let sectionVisibleCount = 0;
+        const cards = section.querySelectorAll<HTMLElement>('.calc-card');
+        let sectionVisibleCount = 0;
 
-      cards.forEach((card) => {
-        const title = card.getAttribute('data-title') || '';
-        const norm = card.getAttribute('data-norm') || '';
-        const desc = card.getAttribute('data-desc') || '';
+        cards.forEach((card) => {
+          const title = card.getAttribute('data-title') || '';
+          const norm = card.getAttribute('data-norm') || '';
+          const desc = card.getAttribute('data-desc') || '';
 
-        const matchesSearch =
-          searchQuery === '' ||
-          title.includes(searchQuery) ||
-          norm.includes(searchQuery) ||
-          desc.includes(searchQuery);
+          const matchesSearch =
+            searchQuery === '' ||
+            title.includes(searchQuery) ||
+            norm.includes(searchQuery) ||
+            desc.includes(searchQuery);
 
-        if (matchesSearch) {
-          card.classList.remove('hidden');
-          sectionVisibleCount++;
-          totalVisible++;
+          if (matchesSearch) {
+            card.classList.remove('hidden');
+            sectionVisibleCount++;
+            totalVisible++;
+          } else {
+            card.classList.add('hidden');
+          }
+        });
+
+        if (sectionVisibleCount > 0) {
+          section.classList.remove('hidden');
         } else {
-          card.classList.add('hidden');
+          section.classList.add('hidden');
         }
       });
 
-      if (sectionVisibleCount > 0) {
-        section.classList.remove('hidden');
-      } else {
-        section.classList.add('hidden');
-      }
-    });
-
-    if (noResults) {
-      if (totalVisible === 0) {
-        noResults.classList.remove('hidden');
-      } else {
-        noResults.classList.add('hidden');
+      if (noResults) {
+        if (totalVisible === 0) {
+          noResults.classList.remove('hidden');
+        } else {
+          noResults.classList.add('hidden');
+        }
       }
     }
-  }
 
-  // Search input handler with debounce
-  searchInput?.addEventListener('input', (e) => {
-    searchQuery = (e.target as HTMLInputElement).value.trim().toLowerCase();
-    filterCards();
-  });
-
-  // Filter chips handler
-  chips.forEach((chip) => {
-    chip.addEventListener('click', () => {
-      chips.forEach((c) => {
-        c.classList.remove('bg-[var(--accent)]', 'text-[var(--btn-text)]', 'font-semibold');
-        c.classList.add('bg-[var(--surface)]', 'text-[var(--text-muted)]', 'font-medium');
-      });
-      chip.classList.remove('bg-[var(--surface)]', 'text-[var(--text-muted)]', 'font-medium');
-      chip.classList.add('bg-[var(--accent)]', 'text-[var(--btn-text)]', 'font-semibold');
-
-      activeCategory = chip.getAttribute('data-filter') || 'all';
+    // Search input handler with debounce
+    searchInput?.addEventListener('input', (e) => {
+      searchQuery = (e.target as HTMLInputElement).value.trim().toLowerCase();
       filterCards();
     });
-  });
+
+    // Filter chips handler
+    chips.forEach((chip) => {
+      chip.onclick = () => {
+        chips.forEach((c) => {
+          c.classList.remove('bg-[var(--accent)]', 'text-[var(--btn-text)]', 'font-semibold');
+          c.classList.add('bg-[var(--surface)]', 'text-[var(--text-muted)]', 'font-medium');
+        });
+        chip.classList.remove('bg-[var(--surface)]', 'text-[var(--text-muted)]', 'font-medium');
+        chip.classList.add('bg-[var(--accent)]', 'text-[var(--btn-text)]', 'font-semibold');
+
+        activeCategory = chip.getAttribute('data-filter') || 'all';
+        filterCards();
+      };
+    });
+  }
+
+  document.addEventListener('astro:page-load', initCatalogFilters);
 </script>
