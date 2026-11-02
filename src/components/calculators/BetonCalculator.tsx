@@ -23,7 +23,13 @@ export function BetonCalculator() {
   // General parameters
   const [margin, setMargin] = useState<number>(5);
   const [grade, setGrade] = useState<'M200' | 'M250' | 'M300'>('M250');
-  const [result, setResult] = useState<ConcreteResult | null>(null);
+  const [result, setResult] = useState<ConcreteResult | null>(() => {
+    try {
+      return calculateConcrete({ type: 'tape', totalLength: 40, tapeWidth: 0.4, tapeHeight: 0.8, marginPercent: 5 }, 'M250');
+    } catch {
+      return null;
+    }
+  });
 
   // Mobile bottom sheet state
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
@@ -198,12 +204,12 @@ export function BetonCalculator() {
             <label class="block text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
               Тип фундамента
             </label>
-            <div class="flex flex-wrap sm:grid sm:grid-cols-3 gap-2 p-1.5 rounded-2xl bg-[var(--surface-hover)] border border-[var(--border)] max-w-full">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 p-1.5 rounded-2xl bg-[var(--surface-hover)] border border-[var(--border)] w-full">
               <button
                 type="button"
                 onClick={() => setType('tape')}
-                class={`flex-1 min-w-[100px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all min-h-[44px] flex items-center justify-center cursor-pointer text-center ${
-                  type === 'tape' ? 'bg-[var(--accent)] text-[var(--btn-text)] shadow-lg' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+                class={`w-full py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all min-h-[44px] flex items-center justify-center cursor-pointer text-center ${
+                  type === 'tape' ? 'bg-[var(--accent)] text-[var(--btn-text)] shadow-lg font-bold' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
                 }`}
               >
                 Ленточный
@@ -211,8 +217,8 @@ export function BetonCalculator() {
               <button
                 type="button"
                 onClick={() => setType('slab')}
-                class={`flex-1 min-w-[100px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all min-h-[44px] flex items-center justify-center cursor-pointer text-center ${
-                  type === 'slab' ? 'bg-[var(--accent)] text-[var(--btn-text)] shadow-lg' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+                class={`w-full py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all min-h-[44px] flex items-center justify-center cursor-pointer text-center ${
+                  type === 'slab' ? 'bg-[var(--accent)] text-[var(--btn-text)] shadow-lg font-bold' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
                 }`}
               >
                 Монолитная плита
@@ -220,8 +226,8 @@ export function BetonCalculator() {
               <button
                 type="button"
                 onClick={() => setType('pillars')}
-                class={`flex-1 min-w-[100px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all min-h-[44px] flex items-center justify-center cursor-pointer text-center ${
-                  type === 'pillars' ? 'bg-[var(--accent)] text-[var(--btn-text)] shadow-lg' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+                class={`w-full py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all min-h-[44px] flex items-center justify-center cursor-pointer text-center ${
+                  type === 'pillars' ? 'bg-[var(--accent)] text-[var(--btn-text)] shadow-lg font-bold' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
                 }`}
               >
                 Сваи / Столбы
@@ -383,6 +389,7 @@ export function BetonCalculator() {
                 step="1"
                 value={margin}
                 onInput={(e) => setMargin(Number((e.target as HTMLInputElement).value))}
+                onChange={(e) => setMargin(Number((e.target as HTMLInputElement).value))}
                 class="w-full accent-amber-500 cursor-pointer"
               />
               <div class="flex justify-between text-[10px] text-[var(--text-muted)] mt-1">

@@ -17,7 +17,23 @@ export function KirpichCalculator() {
   const [doorHeight, setDoorHeight] = useState<string>('2.1');
   const [doorCount, setDoorCount] = useState<string>('1');
 
-  const [result, setResult] = useState<BrickResult | null>(null);
+  const [result, setResult] = useState<BrickResult | null>(() => {
+    try {
+      return calculateBricks({
+        brickType: 'single',
+        wallLengthM: 10,
+        wallHeightM: 3,
+        wallThickness: 1,
+        openings: [
+          { widthM: 1.5, heightM: 1.5, count: 2 },
+          { widthM: 1.0, heightM: 2.1, count: 1 }
+        ],
+        marginPercent: 5
+      });
+    } catch {
+      return null;
+    }
+  });
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
   useEffect(() => {

@@ -40,7 +40,26 @@ export function ArmaturaCalculator() {
   const [pourRate, setPourRate] = useState<string>('5000');
 
   // Result & Drawer
-  const [result, setResult] = useState<ArmaturaResult | null>(null);
+  const [result, setResult] = useState<ArmaturaResult | null>(() => {
+    try {
+      return calculateArmatura({
+        type: 'tape',
+        totalLength: 40,
+        tapeWidth: 0.4,
+        tapeHeight: 0.8,
+        cornersCount: 4,
+        crossingsCount: 0,
+        barsCount: 4,
+        workingDiameter: 12,
+        clampDiameter: 8,
+        clampSpacing: 0.35,
+        coverLayer: 40,
+        marginPercent: 7
+      });
+    } catch {
+      return null;
+    }
+  });
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
   // Recalculate

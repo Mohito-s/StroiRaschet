@@ -21,7 +21,20 @@ export function PilomaterialyCalculator() {
   const [targetArea, setTargetArea] = useState<string>('60');
   const margin = 5;
 
-  const [result, setResult] = useState<LumberResult | null>(null);
+  const [result, setResult] = useState<LumberResult | null>(() => {
+    try {
+      return calculateLumber({
+        thicknessMm: 50,
+        widthMm: 150,
+        lengthM: 6.0,
+        mode: 'byPieces',
+        piecesCount: 40,
+        marginPercent: 5
+      });
+    } catch {
+      return null;
+    }
+  });
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
   useEffect(() => {
