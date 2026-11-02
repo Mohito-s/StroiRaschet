@@ -2000,7 +2000,6 @@ export class HouseOrb {
         `
         #include <emissivemap_fragment>
         if (vInstanceType > 4.5 && vInstanceType < 5.5) {
-          float refFade = clamp(1.0 - (vWorldY / 2.0), 0.0, 1.0);
           totalEmissiveRadiance = uWindowGlowColor * (0.80 * (0.12 * refFade) * uEmissiveFade * uSceneBrightness * vAmbientAlpha);
         }
         `
@@ -2008,7 +2007,6 @@ export class HouseOrb {
         '#include <dithering_fragment>',
         `
         #include <dithering_fragment>
-        float refFade = clamp(1.0 - (vWorldY / 2.0), 0.0, 1.0);
         gl_FragColor.a = 0.12 * refFade * uSceneBrightness * vAmbientAlpha;
         `
       );
