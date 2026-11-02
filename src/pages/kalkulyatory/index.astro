@@ -236,16 +236,16 @@ const categories = [
           </svg>
         </div>
 
-        <!-- Filter Chips with Category Counts (Horizontal scrollable with smooth touch) -->
-        <div class="flex items-center gap-2 pt-0.5 overflow-x-auto no-scrollbar scroll-smooth w-full min-w-0 pb-1">
-          <button type="button" data-filter="all" class="filter-chip active-filter px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-[var(--accent)] text-[var(--btn-text)] transition-all min-h-[36px] cursor-pointer shadow-sm flex-shrink-0">
+        <!-- Filter Chips with Category Counts (Flex wrap for easy 1-tap selection on mobile & desktop) -->
+        <div class="flex flex-wrap items-center gap-2 pt-0.5 w-full min-w-0 pb-1">
+          <button type="button" data-filter="all" class="filter-chip active-filter px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-[var(--accent)] text-[var(--btn-text)] transition-all min-h-[36px] cursor-pointer shadow-sm">
             Все этапы (16)
           </button>
           {categories.map((cat) => (
             <button
               type="button"
               data-filter={cat.id}
-              class="filter-chip px-3.5 py-1.5 rounded-xl text-xs font-medium bg-[var(--surface)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] transition-all min-h-[36px] cursor-pointer flex-shrink-0"
+              class="filter-chip px-3.5 py-1.5 rounded-xl text-xs font-medium bg-[var(--surface)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] transition-all min-h-[36px] cursor-pointer"
             >
               {cat.shortName} ({cat.count})
             </button>

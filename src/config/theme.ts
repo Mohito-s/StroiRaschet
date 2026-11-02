@@ -126,9 +126,9 @@ export const THEME_PRESETS: Record<string, ThemePreset> = {
       roofGain: 0.30,
       baseGain: 0.20,
       trimGain: 0.42,
-      mortarDarkness: 0.35,
-      mortarWidth: 0.025,
-      mortarGlow: 0.04,
+      mortarDarkness: 0.25,
+      mortarWidth: 0.035,
+      mortarGlow: 0.05,
       maxLuma: 0.54
     }
   },
@@ -185,9 +185,9 @@ export const THEME_PRESETS: Record<string, ThemePreset> = {
       roofGain: 0.30,
       baseGain: 0.20,
       trimGain: 0.42,
-      mortarDarkness: 0.35,
-      mortarWidth: 0.025,
-      mortarGlow: 0.04,
+      mortarDarkness: 0.25,
+      mortarWidth: 0.035,
+      mortarGlow: 0.05,
       maxLuma: 0.54
     }
   },
@@ -244,9 +244,9 @@ export const THEME_PRESETS: Record<string, ThemePreset> = {
       roofGain: 0.30,
       baseGain: 0.20,
       trimGain: 0.42,
-      mortarDarkness: 0.35,
-      mortarWidth: 0.025,
-      mortarGlow: 0.04,
+      mortarDarkness: 0.25,
+      mortarWidth: 0.035,
+      mortarGlow: 0.05,
       maxLuma: 0.54
     }
   },
@@ -303,9 +303,9 @@ export const THEME_PRESETS: Record<string, ThemePreset> = {
       roofGain: 0.30,
       baseGain: 0.20,
       trimGain: 0.42,
-      mortarDarkness: 0.35,
-      mortarWidth: 0.025,
-      mortarGlow: 0.04,
+      mortarDarkness: 0.25,
+      mortarWidth: 0.035,
+      mortarGlow: 0.05,
       maxLuma: 0.54
     }
   },
@@ -354,7 +354,7 @@ export const THEME_PRESETS: Record<string, ThemePreset> = {
     house: {
       wall: '#2c5282',
       roof: '#1a365d',
-      mortar: '#cbd5e1',
+      mortar: '#f1f5f9',
       trim: '#0f172a',
       windowGlow: '#dd6b20',
       smoke: '#64748b',
@@ -362,10 +362,10 @@ export const THEME_PRESETS: Record<string, ThemePreset> = {
       roofGain: 0.72,
       baseGain: 0.55,
       trimGain: 0.90,
-      mortarDarkness: 0.35,
-      mortarWidth: 0.025,
+      mortarDarkness: 0.90,
+      mortarWidth: 0.035,
       mortarGlow: 0.0,
-      maxLuma: 0.75
+      maxLuma: 0.85
     }
   }
 };

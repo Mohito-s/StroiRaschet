@@ -10,7 +10,7 @@ import { getThemeSceneConfig, getThemeHouseConfig, type ThemeScene3DConfig, type
 export interface HouseItem {
   p: [number, number, number];
   s: [number, number, number];
-  type: 'wall' | 'base' | 'roof' | 'trim' | 'door' | 'window' | 'chimney_rim';
+  type: 'wall' | 'base' | 'roof' | 'trim' | 'door' | 'window' | 'chimney_rim' | 'chimney_flue';
   rot: [number, number, number];
 }
 
@@ -130,9 +130,21 @@ export function buildHouse(): HouseItem[] {
       push([s * (W / 2 - T / 2), Hw + r * H + H / 2, -hw + (a + b) / 2], [T, H - G, b - a - G], 'wall');
   }
 
-  // труба
+  // труба с дымоходом: кирпичный ствол + 4-сторонний оголовок с отверстием (flue)
   ring(2.0, 1.0, 0.75, 0.75, 4.1, 9);
-  add([2.0, 6.42, 1.0], [0.95, 0.1, 0.95], 'chimney_rim');
+  const rimOuter = 0.96;
+  const flueHole = 0.36;
+  const rimSide = (rimOuter - flueHole) / 2; // 0.30
+  const rimH = 0.12;
+  const rimY = 6.42;
+  // Передний и задний бортики оголовка (по оси Z)
+  add([2.0, rimY, 1.0 + (rimOuter - rimSide) / 2], [rimOuter, rimH, rimSide], 'chimney_rim');
+  add([2.0, rimY, 1.0 - (rimOuter - rimSide) / 2], [rimOuter, rimH, rimSide], 'chimney_rim');
+  // Левый и правый бортики оголовка (по оси X)
+  add([2.0 - (rimOuter - rimSide) / 2, rimY, 1.0], [rimSide, rimH, flueHole], 'chimney_rim');
+  add([2.0 + (rimOuter - rimSide) / 2, rimY, 1.0], [rimSide, rimH, flueHole], 'chimney_rim');
+  // Тёмное дно шахты дымохода (глубокая полость сажи, откуда выходит дым)
+  add([2.0, 6.26, 1.0], [flueHole, 0.08, flueHole], 'chimney_flue');
 
   // черепица: два ската, ряды со сдвигом, лёгкий нахлёст
   const xLen = W + 2 * OVX, Ls = (D / 2 + OV) / Math.cos(PITCH);
@@ -927,6 +939,10 @@ export class HouseOrb {
           typeId = 6.0;
           tint = 1.0;
           break;
+        case 'chimney_flue':
+          typeId = 7.0;
+          tint = 1.0;
+          break;
       }
 
       typeArray[i] = typeId;
@@ -1129,22 +1145,28 @@ export class HouseOrb {
         vec3 dEdgeMeters = max(vec3(0.0), (vec3(0.5) - abs(vLocalPos)) * vInstanceScale);
         vec3 absNorm = abs(vLocalNormal);
         float distToEdgeMeters = (absNorm.x > 0.5) ? min(dEdgeMeters.y, dEdgeMeters.z) : ((absNorm.y > 0.5) ? min(dEdgeMeters.x, dEdgeMeters.z) : min(dEdgeMeters.x, dEdgeMeters.y));
-        float mortarFactor = smoothstep(0.0, uMortarWidth, distToEdgeMeters);
-        float topBevel = (1.0 - mortarFactor) * max(0.0, vLocalNormal.y) * 0.70;
+        
+        // Distinct masonry joint with crisp edge
+        float mortarFactor = smoothstep(uMortarWidth * 0.60, uMortarWidth, distToEdgeMeters);
+        
+        // Tactile bevel / pillow cushion on each brick edge
+        float brickBevel = smoothstep(uMortarWidth, uMortarWidth * 2.4, distToEdgeMeters);
+        float topBevel = (1.0 - mortarFactor) * max(0.0, vLocalNormal.y) * 0.90;
 
         if (vInstanceType < 0.5) {
-          // Masonry brickwork (wall): individual brick tint + distinct mortar joints + enhanced top-bevel highlight
-          vec3 baseBrick = (uWallColor * uWallGain) * (0.80 + 0.38 * vTint);
-          vec3 mortarBase = mix(baseBrick * uMortarDarkness, uMortarColor * uWallGain * uMortarDarkness, 0.6);
-          diffuseColor.rgb = mix(mortarBase, baseBrick, mortarFactor) + (uWallColor * topBevel * 0.20);
+          // Masonry brickwork (wall): individual brick tint + tactile pillow depth + distinct mortar joints
+          vec3 baseBrick = (uWallColor * uWallGain) * (0.80 + 0.38 * vTint) * (0.86 + 0.14 * brickBevel);
+          vec3 mortarBase = uMortarColor * uMortarDarkness;
+          diffuseColor.rgb = mix(mortarBase, baseBrick, mortarFactor) + (uWallColor * topBevel * 0.30);
 
           // Architectural Ambient Occlusion under roof overhang (y in [2.7m, 3.5m])
           float roofShadow = smoothstep(2.7, 3.5, vWorldY);
           diffuseColor.rgb *= (1.0 - 0.28 * roofShadow);
         } else if (vInstanceType < 1.5) {
           // Floor slab (base): foundation with crisp horizontal drip-cap shadow
-          vec3 baseSlab = (uWallColor * uBaseGain) * (0.85 + 0.30 * vTint);
-          diffuseColor.rgb = mix(baseSlab * uMortarDarkness, baseSlab, mortarFactor);
+          vec3 baseSlab = (uWallColor * uBaseGain) * (0.85 + 0.30 * vTint) * (0.86 + 0.14 * brickBevel);
+          vec3 mortarBase = uMortarColor * uMortarDarkness;
+          diffuseColor.rgb = mix(mortarBase, baseSlab, mortarFactor);
         } else if (vInstanceType < 2.5) {
           // Roof tiles: tile tint + mortar/overlap + top-bevel highlight + fascia trim edge
           vec3 baseRoof = (uRoofColor * uRoofGain) * (0.82 + 0.36 * vTint);
@@ -1173,8 +1195,11 @@ export class HouseOrb {
           vec3 frameColor = vec3(0.035, 0.030, 0.025);
           vec3 glassTint = vec3(0.015, 0.012, 0.010);
           diffuseColor.rgb = mix(glassTint, frameColor, isSash);
+        } else if (vInstanceType > 6.5) {
+          // Chimney flue (dark hole / soot shaft inside chimney rim)
+          diffuseColor.rgb = vec3(0.012, 0.012, 0.015);
         } else {
-          // Chimney rim: glowing accent rim
+          // Chimney rim: glowing accent rim around opening
           diffuseColor.rgb = uAccentColor * 0.35;
         }
 
@@ -1218,8 +1243,8 @@ export class HouseOrb {
           // Total emissive radiance: strictly through glass (frame stays dark!),
           // directly driven by living window events (vWindowEmissive dims or shuts off visibly!)
           totalEmissiveRadiance = winEmissive * (vWindowEmissive * isGlass * (uEmissiveFade * uSceneBrightness * vAmbientAlpha));
-        } else if (vInstanceType > 5.5) {
-          // Chimney rim: subtle accent glow
+        } else if (vInstanceType > 5.5 && vInstanceType < 6.5) {
+          // Chimney rim: subtle accent glow (flue hole inside stays dark soot black)
           totalEmissiveRadiance = uAccentColor * (0.65 * uEmissiveFade * uSceneBrightness * vAmbientAlpha);
         } else if (vInstanceType < 2.5) {
           // Mortar inner glow for walls and roof in dark themes (light leaking from inside)
@@ -1748,9 +1773,9 @@ export class HouseOrb {
 
     const smokeRng = createSeededRandom(999);
     for (let i = 0; i < smokeCount; i++) {
-      // Chimney rim is at (2.0, 6.47, 1.0)
+      // Chimney flue hole opening is at (2.0, 6.36, 1.0)
       pos[i * 3] = 2.0;
-      pos[i * 3 + 1] = 6.47;
+      pos[i * 3 + 1] = 6.36;
       pos[i * 3 + 2] = 1.0;
       progOffsets[i] = i / smokeCount;
       lifetimes[i] = 6.0 + smokeRng() * 2.0; // 6 - 8s
@@ -1786,9 +1811,9 @@ export class HouseOrb {
           float p = fract(t);
           vProgress = p;
 
-          // Chimney rim is at (2.0, 6.47, 1.0)
-          // Rises 3.5m over 6-8s from chimney top (y = 6.47 to 9.97)
-          float y = 6.47 + p * 3.5;
+          // Chimney flue hole opening is at (2.0, 6.36, 1.0)
+          // Rises 3.5m over 6-8s straight from the chimney flue hole
+          float y = 6.36 + p * 3.5;
 
           // Soft wind drift to the right + gentle curling turbulence
           float curl1 = sin(p * 5.0 + aSeed.x * 6.28) * 0.25 * p;
@@ -1798,8 +1823,8 @@ export class HouseOrb {
 
           vec3 pos = vec3(2.0 + windX, y, 1.0 + windZ);
 
-          // Expands from 0.40m up to 2.10m (billowy, soft clouds of smoke)
-          float sizeMeters = mix(0.40, 2.10, pow(p, 0.7));
+          // Expands from 0.32m (flue hole diameter) up to 2.10m
+          float sizeMeters = mix(0.32, 2.10, pow(p, 0.7));
 
           vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
           // Perspective point size calibrated for fov=32: H / (2 * tan(fov/2)) ≈ 1550
@@ -2600,6 +2625,7 @@ export class HouseOrb {
 
         switch (item.type) {
           case 'chimney_rim':
+          case 'chimney_flue':
             tStart = 0.00;
             tEnd = 0.22;
             break;
@@ -2767,6 +2793,7 @@ export class HouseOrb {
             tEnd = tStart + 0.32;
             break;
           case 'chimney_rim':
+          case 'chimney_flue':
             tStart = 0.70;
             tEnd = 0.98;
             break;
