@@ -200,14 +200,14 @@ const categories = [
   description="Полный перечень инженерных онлайн-калькуляторов: фундамент, бетон, кирпич, пиломатериалы, кровля, утепление, стяжка и электрика. Точные формулы без регистрации."
   breadcrumbs={breadcrumbs}
 >
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow space-y-8">
+  <div class="w-full min-w-0 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow space-y-8">
     <Breadcrumbs items={breadcrumbs} />
 
     <!-- Hero Header -->
-    <header class="space-y-4">
-      <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--surface)] border border-[var(--border)] text-xs text-[var(--accent)] font-semibold shadow-sm">
-        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span>16 инженерных калькуляторов по актуальным нормам СП и ГОСТ</span>
+    <header class="space-y-4 min-w-0 max-w-full">
+      <div class="inline-flex max-w-full items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--surface)] border border-[var(--border)] text-xs text-[var(--accent)] font-semibold shadow-sm">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+        <span class="truncate sm:whitespace-normal">16 инженерных калькуляторов по актуальным нормам СП и ГОСТ</span>
       </div>
 
       <h1 class="text-3xl sm:text-5xl font-black text-[var(--text)] tracking-tight leading-tight">
@@ -301,26 +301,26 @@ const categories = [
               return (
                 <a
                   href={`/kalkulyatory/${item.id}/`}
-                  class="calc-card glass-card glass-card-hover p-6 rounded-2xl flex flex-col justify-between group min-h-[190px] relative border border-[var(--border)]"
+                  class="calc-card glass-card glass-card-hover p-5 sm:p-6 rounded-2xl flex flex-col justify-between group min-h-[190px] relative border border-[var(--border)] min-w-0 max-w-full"
                   data-title={item.title.toLowerCase()}
                   data-norm={item.norm.toLowerCase()}
                   data-desc={item.desc.toLowerCase()}
                 >
-                  <div>
-                    <div class="flex items-center justify-between gap-2 mb-3">
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
                       <!-- Standard Norm Badge -->
-                      <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--bg)] text-[var(--accent)] border border-[var(--border)]">
+                      <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--bg)] text-[var(--accent)] border border-[var(--border)] shrink-0">
                         {item.norm}
                       </span>
 
                       <!-- Popular / Time Badge -->
-                      <div class="flex items-center gap-1.5">
+                      <div class="flex flex-wrap items-center gap-1.5">
                         {isPopular && (
-                          <span class="text-[9px] font-bold uppercase tracking-wider text-amber-300 bg-amber-400/15 px-2 py-0.5 rounded-full border border-amber-400/30">
+                          <span class="text-[9px] font-bold uppercase tracking-wider text-amber-300 bg-amber-400/15 px-2 py-0.5 rounded-full border border-amber-400/30 shrink-0">
                             ★ Популярное
                           </span>
                         )}
-                        <span class="text-[10px] text-[var(--text-muted)] font-medium">
+                        <span class="text-[10px] text-[var(--text-muted)] font-medium shrink-0">
                           Результат за 30 секунд
                         </span>
                       </div>

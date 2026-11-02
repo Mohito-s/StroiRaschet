@@ -337,6 +337,10 @@ export class HouseOrb {
   private houseSphereCenter = new THREE.Vector3(0, 2.5, 0);
   private anchorElement: HTMLElement | null = null;
   private anchorResizeObserver?: ResizeObserver;
+  private lastAnchorOffsetX = 0;
+  private lastAnchorOffsetY = 0;
+  private lastAnchorDist = 25;
+  private lastAnchorTargetY = 2.5;
 
   // House geometry bounds for exact projection fitting
   private houseBox = new THREE.Box3();
@@ -1133,27 +1137,42 @@ export class HouseOrb {
           vec3 baseBrick = (uWallColor * uWallGain) * (0.80 + 0.38 * vTint);
           vec3 mortarBase = mix(baseBrick * uMortarDarkness, uMortarColor * uWallGain * uMortarDarkness, 0.6);
           diffuseColor.rgb = mix(mortarBase, baseBrick, mortarFactor) + (uWallColor * topBevel * 0.20);
+
+          // Architectural Ambient Occlusion under roof overhang (y in [2.7m, 3.5m])
+          float roofShadow = smoothstep(2.7, 3.5, vWorldY);
+          diffuseColor.rgb *= (1.0 - 0.28 * roofShadow);
         } else if (vInstanceType < 1.5) {
-          // Floor slab (base): foundation
+          // Floor slab (base): foundation with crisp horizontal drip-cap shadow
           vec3 baseSlab = (uWallColor * uBaseGain) * (0.85 + 0.30 * vTint);
           diffuseColor.rgb = mix(baseSlab * uMortarDarkness, baseSlab, mortarFactor);
         } else if (vInstanceType < 2.5) {
-          // Roof tiles: tile tint + mortar/overlap + top-bevel highlight
+          // Roof tiles: tile tint + mortar/overlap + top-bevel highlight + fascia trim edge
           vec3 baseRoof = (uRoofColor * uRoofGain) * (0.82 + 0.36 * vTint);
-          diffuseColor.rgb = mix(baseRoof * uMortarDarkness, baseRoof, mortarFactor) + (uRoofColor * topBevel * 0.20);
+          vec3 fasciaTrim = mix(baseRoof * 0.60, uTrimColor * 0.45, 0.5);
+          diffuseColor.rgb = mix(fasciaTrim, baseRoof, mortarFactor) + (uRoofColor * topBevel * 0.20);
         } else if (vInstanceType < 3.5) {
-          // Trim: architectural trim/frames
-          diffuseColor.rgb = uTrimColor * uTrimGain;
+          // Trim: architectural frame / lintel / sill with bevel highlight
+          diffuseColor.rgb = uTrimColor * uTrimGain * (0.90 + 0.20 * topBevel);
         } else if (vInstanceType < 4.5) {
-          // Door: dark rich wood
-          diffuseColor.rgb = vec3(0.10, 0.06, 0.03);
+          // Door: paneled rich timber door with brass knob
+          float topPanel = step(0.18, vWindowUv.x) * step(vWindowUv.x, 0.82) * step(0.54, vWindowUv.y) * step(vWindowUv.y, 0.88);
+          float btmPanel = step(0.18, vWindowUv.x) * step(vWindowUv.x, 0.82) * step(0.12, vWindowUv.y) * step(vWindowUv.y, 0.46);
+          float panelRecess = topPanel + btmPanel;
+          vec3 woodBase = vec3(0.16, 0.09, 0.05);
+          vec3 woodRecess = vec3(0.08, 0.045, 0.025);
+          diffuseColor.rgb = mix(woodBase, woodRecess, panelRecess * 0.65);
+          // Brass door knob at (0.24, 0.50)
+          float knobDist = length(vec2(vWindowUv.x - 0.24, (vWindowUv.y - 0.50) * 1.8));
+          if (knobDist < 0.045) {
+            diffuseColor.rgb = vec3(0.85, 0.70, 0.28);
+          }
         } else if (vInstanceType < 5.5) {
-          // Window: luminous warm glass with bright white core in central 40% area
-          float innerDist = max(abs(vWindowUv.x - 0.5), abs(vWindowUv.y - 0.5));
-          float isCenter = 1.0 - smoothstep(0.24, 0.316, innerDist);
-          vec3 amberGlass = uWindowGlowColor * 0.75;
-          vec3 whiteCore = vec3(1.0, 0.98, 0.94);
-          diffuseColor.rgb = mix(amberGlass, whiteCore, isCenter);
+          // Window: dark architectural sash frame border + dark tinted glass (never washed out by sun!)
+          float borderDist = min(min(vWindowUv.x, 1.0 - vWindowUv.x), min(vWindowUv.y, 1.0 - vWindowUv.y));
+          float isSash = 1.0 - smoothstep(0.05, 0.10, borderDist);
+          vec3 frameColor = vec3(0.035, 0.030, 0.025);
+          vec3 glassTint = vec3(0.015, 0.012, 0.010);
+          diffuseColor.rgb = mix(glassTint, frameColor, isSash);
         } else {
           // Chimney rim: glowing accent rim
           diffuseColor.rgb = uAccentColor * 0.35;
@@ -1172,20 +1191,33 @@ export class HouseOrb {
         `
         #include <emissivemap_fragment>
         if (vInstanceType > 4.5 && vInstanceType < 5.5) {
-          // Window: luminous emissive with warm amber glow and brilliant white core
-          float innerDist = max(abs(vWindowUv.x - 0.5), abs(vWindowUv.y - 0.5));
-          float isCenter = 1.0 - smoothstep(0.24, 0.316, innerDist);
+          // Window: dark sash frame has NO emissive (crisp frame!);
+          // The glass interior has deep luminous hearth glow + living fireplace flutter!
+          float borderDist = min(min(vWindowUv.x, 1.0 - vWindowUv.x), min(vWindowUv.y, 1.0 - vWindowUv.y));
+          float isSash = 1.0 - smoothstep(0.05, 0.10, borderDist);
+          float isGlass = 1.0 - isSash;
 
           // Living fireplace & candle hearth micro-flicker (warm flame dynamics)
           float flame1 = sin(uTime * 3.7 + vWorldY * 2.8 + vWindowUv.x * 4.0);
-          float flame2 = cos(uTime * 6.9 + vWorldY * 4.2 - vWindowUv.y * 5.0);
-          float flame3 = sin(uTime * 11.3 + vWindowUv.x * 8.0);
-          float hearthFlicker = 1.0 + 0.055 * flame1 + 0.035 * flame2 + 0.020 * flame3;
+          float flame2 = cos(uTime * 7.1 + vWorldY * 4.2 - vWindowUv.y * 5.0);
+          float flame3 = sin(uTime * 11.5 + vWindowUv.x * 8.0);
+          float hearthFlicker = 1.0 + 0.08 * flame1 + 0.05 * flame2 + 0.025 * flame3;
 
-          vec3 winColorEmissive = uWindowGlowColor * (0.92 * hearthFlicker);
-          vec3 coreEmissive = vec3(1.0, 0.98, 0.92) * (1.38 * hearthFlicker);
-          vec3 winEmissive = mix(winColorEmissive, coreEmissive, isCenter);
-          totalEmissiveRadiance = winEmissive * (min(1.5, vWindowEmissive) * (uEmissiveFade * uSceneBrightness * vAmbientAlpha));
+          // Interior depth gradient: warmer hearth amber towards bottom, soft glow upwards
+          float interiorY = clamp(vWindowUv.y, 0.0, 1.0);
+          vec3 warmHearth = vec3(1.0, 0.65, 0.28);
+          vec3 ambientInterior = uWindowGlowColor * 1.10;
+          vec3 baseGlassLight = mix(warmHearth, ambientInterior, interiorY * 0.40);
+
+          // Brilliant warm core in center of pane
+          float innerDist = max(abs(vWindowUv.x - 0.5), abs(vWindowUv.y - 0.5));
+          float isCenter = 1.0 - smoothstep(0.18, 0.38, innerDist);
+          vec3 coreEmissive = vec3(1.0, 0.98, 0.90) * 1.60;
+          vec3 winEmissive = mix(baseGlassLight, coreEmissive, isCenter * 0.70) * hearthFlicker;
+
+          // Total emissive radiance: strictly through glass (frame stays dark!),
+          // directly driven by living window events (vWindowEmissive dims or shuts off visibly!)
+          totalEmissiveRadiance = winEmissive * (vWindowEmissive * isGlass * (uEmissiveFade * uSceneBrightness * vAmbientAlpha));
         } else if (vInstanceType > 5.5) {
           // Chimney rim: subtle accent glow
           totalEmissiveRadiance = uAccentColor * (0.65 * uEmissiveFade * uSceneBrightness * vAmbientAlpha);
@@ -1218,8 +1250,13 @@ export class HouseOrb {
         } else if (vInstanceType > 3.5 && vInstanceType < 4.5) {
           // Door wood texture roughness
           roughnessFactor = 0.85;
-        } else if (vInstanceType > 4.5) {
-          // Windows and chimney rim
+        } else if (vInstanceType > 4.5 && vInstanceType < 5.5) {
+          // Window glass is ultra-glossy (0.08) for crisp reflections; frame is satin (0.75)
+          float borderDist = min(min(vWindowUv.x, 1.0 - vWindowUv.x), min(vWindowUv.y, 1.0 - vWindowUv.y));
+          float isSash = 1.0 - smoothstep(0.05, 0.10, borderDist);
+          roughnessFactor = mix(0.08, 0.75, isSash);
+        } else if (vInstanceType > 5.5) {
+          // Chimney rim
           roughnessFactor = 0.2;
         }
         `
@@ -1607,13 +1644,13 @@ export class HouseOrb {
         varying vec2 vUv;
         void main() {
           // vUv.y goes from 0.0 at wall to 1.0 outward (decaying smoothly to 0 at 2m)
-          float distFalloff = pow(clamp(1.0 - vUv.y, 0.0, 1.0), 1.6);
+          float distFalloff = pow(clamp(1.0 - vUv.y, 0.0, 1.0), 1.35);
           // vUv.x across width [0..1]
           float sideFalloff = sin(clamp(vUv.x, 0.0, 1.0) * 3.14159265);
           // Breathing hearth light on grass/ground in sync with fireplace
-          float hearthBreath = 1.0 + 0.06 * sin(uTime * 3.7) + 0.04 * cos(uTime * 6.9);
-          float intensity = distFalloff * sideFalloff * 0.18 * uFade * hearthBreath;
-          vec3 warmWindow = vec3(1.0, 0.72, 0.38);
+          float hearthBreath = 1.0 + 0.09 * sin(uTime * 3.7) + 0.05 * cos(uTime * 7.1);
+          float intensity = distFalloff * sideFalloff * 0.55 * uFade * hearthBreath;
+          vec3 warmWindow = vec3(1.0, 0.76, 0.40);
           gl_FragColor = vec4(warmWindow * intensity, intensity);
         }
       `,
@@ -1626,22 +1663,22 @@ export class HouseOrb {
 
     const spots: { pos: [number, number, number]; rotZ: number; width?: number; length?: number }[] = [
       // Front wall (Z = 2.5, extending +Z)
-      { pos: [-2.2, -0.045, 2.5], rotZ: 0 },
-      { pos: [2.2, -0.045, 2.5], rotZ: 0 },
-      { pos: [0, -0.045, 2.5], rotZ: 0, width: 1.2, length: 1.8 }, // door light
+      { pos: [-2.2, -0.044, 2.5], rotZ: 0 },
+      { pos: [2.2, -0.044, 2.5], rotZ: 0 },
+      { pos: [0, -0.044, 2.5], rotZ: 0, width: 1.2, length: 1.8 }, // door light
 
       // Back wall (Z = -2.5, extending -Z)
-      { pos: [-2.4, -0.045, -2.5], rotZ: Math.PI },
-      { pos: [0, -0.045, -2.5], rotZ: Math.PI },
-      { pos: [2.4, -0.045, -2.5], rotZ: Math.PI },
+      { pos: [-2.4, -0.044, -2.5], rotZ: Math.PI },
+      { pos: [0, -0.044, -2.5], rotZ: Math.PI },
+      { pos: [2.4, -0.044, -2.5], rotZ: Math.PI },
 
       // Right wall (X = 3.5, extending +X)
-      { pos: [3.5, -0.045, -1.1], rotZ: -Math.PI / 2 },
-      { pos: [3.5, -0.045, 1.1], rotZ: -Math.PI / 2 },
+      { pos: [3.5, -0.044, -1.1], rotZ: -Math.PI / 2 },
+      { pos: [3.5, -0.044, 1.1], rotZ: -Math.PI / 2 },
 
       // Left wall (X = -3.5, extending -X)
-      { pos: [-3.5, -0.045, -1.1], rotZ: Math.PI / 2 },
-      { pos: [-3.5, -0.045, 1.1], rotZ: Math.PI / 2 }
+      { pos: [-3.5, -0.044, -1.1], rotZ: Math.PI / 2 },
+      { pos: [-3.5, -0.044, 1.1], rotZ: Math.PI / 2 }
     ];
 
     for (const s of spots) {
@@ -2554,11 +2591,47 @@ export class HouseOrb {
       const alphaAttr = this.instancedCubes.geometry.getAttribute('aAmbientAlpha') as THREE.InstancedBufferAttribute;
       const alphaArray = alphaAttr?.array as Float32Array;
 
-      // Wave dispersal based on distance from center and height
+      // Staged disassembly TOP-TO-BOTTOM (сверху вниз: дым/труба -> конёк/крыша -> верхние стены/окна -> нижние стены -> цоколь)
       for (let i = 0; i < this.cubesData.length; i++) {
         const item = this.cubesData[i];
-        const waveDelay = 0.20 * item.distNorm + 0.15 * item.heightNorm;
-        const localT = Math.max(0.0, Math.min(1.0, (this.transitionElapsed - waveDelay) / Math.max(0.01, this.transitionDuration - waveDelay)));
+        let tStart = 0.05;
+        let tEnd = 0.35;
+        const invHeight = 1.0 - item.heightNorm;
+
+        switch (item.type) {
+          case 'chimney_rim':
+            tStart = 0.00;
+            tEnd = 0.22;
+            break;
+          case 'roof':
+            // Ridge dissolves first (y > 4.5), then down the slopes
+            tStart = 0.04 + (item.basePos.y > 4.5 ? 0.0 : 0.12);
+            tEnd = tStart + 0.28;
+            break;
+          case 'window':
+          case 'trim':
+            tStart = 0.18 + invHeight * 0.32;
+            tEnd = tStart + 0.28;
+            break;
+          case 'door':
+            tStart = 0.42;
+            tEnd = 0.72;
+            break;
+          case 'wall':
+            tStart = 0.16 + invHeight * 0.44;
+            tEnd = tStart + 0.30;
+            break;
+          case 'base':
+            tStart = 0.62;
+            tEnd = 0.98;
+            break;
+          default:
+            tStart = 0.20;
+            tEnd = 0.60;
+            break;
+        }
+
+        const localT = Math.max(0.0, Math.min(1.0, (this.transitionElapsed - tStart) / (tEnd - tStart)));
         const ease = 1.0 - Math.pow(1.0 - localT, 3);
 
         if (item.isAmbient) {
@@ -2923,9 +2996,9 @@ export class HouseOrb {
               mult = 1.0 - group.dimDepth * curve;
               needsAttrUpdate = true;
             } else if (time >= group.nextDimTime + group.dimDuration) {
-              group.nextDimTime = time + 3.0 + Math.random() * 6.5; // 3–9.5s lively pace
-              group.dimDuration = 0.7 + Math.random() * 1.0;        // 0.7–1.7s
-              group.dimDepth = 0.25 + Math.random() * 0.25;         // 25–50%
+              group.nextDimTime = time + 2.5 + Math.random() * 5.5; // 2.5–8s lively pace
+              group.dimDuration = 0.8 + Math.random() * 1.0;        // 0.8–1.8s
+              group.dimDepth = 0.45 + Math.random() * 0.35;         // 45–80% distinct dimming
             }
           }
 
@@ -3350,99 +3423,85 @@ export class HouseOrb {
     const pmX = isTouchOrReduced ? 0.0 : this.mouse.x;
     const pmY = isTouchOrReduced ? 0.0 : this.mouse.y;
 
-    if (this.mode === 'house' || this.transitionState === 'ambient_to_house') {
+    const isHouseOrTransition = this.mode === 'house' || 
+                                this.transitionState === 'ambient_to_house' || 
+                                this.transitionState === 'house_to_ambient';
+
+    if (isHouseOrTransition) {
+      let offsetX = this.lastAnchorOffsetX;
+      let offsetY = this.lastAnchorOffsetY;
+      let dist = this.lastAnchorDist || this.fittingDist;
+      let targetY = this.lastAnchorTargetY || (this.houseBoxCenter.y + this.cameraLookAtY);
+
       if (this.anchorElement && W > 0 && H > 0) {
         const rect = this.anchorElement.getBoundingClientRect();
-        const rectW = Math.max(1, rect.width);
-        const rectH = Math.max(1, rect.height);
-        const cx = rect.left + rectW / 2;
-        const cy = rect.top + rectH / 2;
+        if (rect.width > 50 && rect.height > 50) {
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height / 2;
 
-        const isOffscreen = rect.bottom <= 0 || rect.top >= H || rect.right <= 0 || rect.left >= W;
-        if (isOffscreen) {
-          this.stage.visible = false;
-          if (this.isDebug) {
-            this.updateDebugOverlay(rect, null, W, H, cx, cy, window.scrollY, 0, 0, this.fittingDist, true);
+          const isOffscreen = rect.bottom <= 0 || rect.top >= H || rect.right <= 0 || rect.left >= W;
+          if (isOffscreen && this.mode === 'house' && this.transitionState === 'idle') {
+            this.stage.visible = false;
+            return;
           }
-          return;
+
+          offsetX = -(cx - W / 2);
+          offsetY = -(cy - H / 2);
+          dist = this.fittingDist;
+          targetY = this.houseBoxCenter.y + this.cameraLookAtY;
+
+          this.lastAnchorOffsetX = offsetX;
+          this.lastAnchorOffsetY = offsetY;
+          this.lastAnchorDist = dist;
+          this.lastAnchorTargetY = targetY;
         }
+      }
 
-        this.stage.visible = true;
+      this.stage.visible = true;
 
-        const offsetX = -(cx - W / 2);
-        const offsetY = -(cy - H / 2);
+      if (this.transitionState === 'ambient_to_house') {
+        const tau = Math.min(1.0, this.transitionElapsed / this.transitionDuration);
+        const ease = 1.0 - Math.pow(1.0 - tau, 3);
+        this.camera.setViewOffset(W, H, offsetX * ease, offsetY * ease, W, H);
+      } else if (this.transitionState === 'house_to_ambient') {
+        // Keep house firmly in anchor place during top-to-bottom disassembly!
+        // Only in the last 15% smoothly ease viewOffset to center for ambient drifting
+        const tau = Math.min(1.0, this.transitionElapsed / this.transitionDuration);
+        const centerEase = tau < 0.85 ? 1.0 : (1.0 - (tau - 0.85) / 0.15);
+        this.camera.setViewOffset(W, H, offsetX * centerEase, offsetY * centerEase, W, H);
+      } else {
+        this.camera.setViewOffset(W, H, offsetX, offsetY, W, H);
+      }
 
-        if (this.transitionState === 'ambient_to_house') {
-          const tau = Math.min(1.0, this.transitionElapsed / this.transitionDuration);
-          const ease = 1.0 - Math.pow(1.0 - tau, 3);
-          this.camera.setViewOffset(W, H, offsetX * ease, offsetY * ease, W, H);
-        } else {
-          this.camera.setViewOffset(W, H, offsetX, offsetY, W, H);
-        }
+      this.currentDist = dist;
 
-        const dist = this.fittingDist;
-        this.currentDist = dist;
+      const elevationAngle = THREE.MathUtils.degToRad(this.cameraElevation);
+      const dXZ = dist * Math.cos(elevationAngle);
+      const viewAngle = THREE.MathUtils.degToRad(this.cameraAzimuth);
 
-        const elevationAngle = THREE.MathUtils.degToRad(this.cameraElevation);
-        const dXZ = dist * Math.cos(elevationAngle);
-        const viewAngle = THREE.MathUtils.degToRad(this.cameraAzimuth);
-        const targetY = this.houseBoxCenter.y + this.cameraLookAtY;
+      const camX = dXZ * Math.sin(viewAngle) + pmX * 0.35;
+      const camZ = dXZ * Math.cos(viewAngle);
+      const camY = (targetY + dXZ * Math.tan(elevationAngle)) + pmY * 0.25;
 
-        const camX = dXZ * Math.sin(viewAngle) + pmX * 0.35;
-        const camZ = dXZ * Math.cos(viewAngle);
-        const camY = (targetY + dXZ * Math.tan(elevationAngle)) + pmY * 0.25;
+      this.camera.fov = this.cameraFov;
+      this.camera.position.set(camX, camY, camZ);
+      this.camera.up.set(0, 1, 0);
+      this.camera.lookAt(0, targetY, 0);
+      this.camera.updateProjectionMatrix();
 
-        this.camera.fov = this.cameraFov;
-        this.camera.position.set(camX, camY, camZ);
-        this.camera.up.set(0, 1, 0);
-        this.camera.lookAt(0, targetY, 0);
-        this.camera.updateProjectionMatrix();
+      this.stage.rotation.y = this.turntableAngle + pmX * 0.35;
+      this.stage.rotation.x = 0;
+      this.stage.rotation.z = 0;
+      this.stage.position.set(0, 0, 0);
+      this.stage.updateMatrixWorld(true);
 
-        this.stage.rotation.y = this.turntableAngle + pmX * 0.35;
-        this.stage.rotation.x = 0;
-        this.stage.rotation.z = 0;
-        this.stage.position.set(0, 0, 0);
-        this.stage.updateMatrixWorld(true);
-
-        if (this.scene.fog && this.scene.fog instanceof THREE.FogExp2) {
-          this.scene.fog.density = 0.325 / Math.max(1, this.currentDist);
-        }
-
-        if (this.isDebug) {
-          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-          const tempV = new THREE.Vector3();
-          for (const corner of this.houseCorners) {
-            tempV.copy(corner).applyMatrix4(this.stage.matrixWorld).project(this.camera);
-            const px = (tempV.x * 0.5 + 0.5) * W;
-            const py = (-tempV.y * 0.5 + 0.5) * H;
-            if (px < minX) minX = px;
-            if (px > maxX) maxX = px;
-            if (py < minY) minY = py;
-            if (py > maxY) maxY = py;
-          }
-          const houseProj = { minX, maxX, minY, maxY, width: maxX - minX, height: maxY - minY };
-          this.updateDebugOverlay(rect, houseProj, W, H, cx, cy, window.scrollY, offsetX, offsetY, dist, false);
-        }
+      if (this.scene.fog && this.scene.fog instanceof THREE.FogExp2) {
+        this.scene.fog.density = 0.325 / Math.max(1, this.currentDist);
       }
     } else {
-      // Ambient mode (or house_to_ambient)
+      // Idle ambient mode (camera gently centered)
       this.stage.visible = true;
-      if (this.transitionState === 'house_to_ambient') {
-        const tau = Math.min(1.0, this.transitionElapsed / this.transitionDuration);
-        const ease = Math.pow(tau, 2);
-        if (this.anchorElement) {
-          const rect = this.anchorElement.getBoundingClientRect();
-          const cx = rect.left + Math.max(1, rect.width) / 2;
-          const cy = rect.top + Math.max(1, rect.height) / 2;
-          const offsetX = -(cx - W / 2) * (1.0 - ease);
-          const offsetY = -(cy - H / 2) * (1.0 - ease);
-          this.camera.setViewOffset(W, H, offsetX, offsetY, W, H);
-        } else {
-          this.camera.clearViewOffset();
-        }
-      } else {
-        this.camera.clearViewOffset();
-      }
+      this.camera.clearViewOffset();
 
       this.camera.fov = 32;
       this.camera.position.set(pmX * 0.5, 3.0 + pmY * 0.3, 24);

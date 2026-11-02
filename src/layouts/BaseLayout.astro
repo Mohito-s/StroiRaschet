@@ -79,7 +79,7 @@ const {
       webApp={webApp}
     />
   </head>
-  <body class="bg-[var(--bg)] text-[var(--text)] min-h-[100svh] flex flex-col selection:bg-[var(--glow)] selection:text-[var(--text)] transition-colors duration-300 relative">
+  <body class="bg-[var(--bg)] text-[var(--text)] min-h-[100svh] flex flex-col selection:bg-[var(--glow)] selection:text-[var(--text)] transition-colors duration-300 relative max-w-full overflow-x-hidden">
     <!-- Persistent Unified 3D WebGL Scene Root (Astro transition:persist preserves canvas and WebGL context across page navigations) -->
     <div
       id="scene-root"
@@ -103,7 +103,7 @@ const {
     <Header />
 
     <!-- Main Content Area -->
-    <main id="main-content" class="flex-1 flex flex-col relative z-10 page-transition-enter">
+    <main id="main-content" class="flex-1 flex flex-col min-w-0 w-full relative z-10 page-transition-enter overflow-x-hidden">
       <slot />
     </main>
 
