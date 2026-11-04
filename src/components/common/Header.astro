@@ -142,24 +142,94 @@ const currentPath = Astro.url.pathname;
       </div>
     </div>
   </div>
+
+  <!-- Mobile Backdrop: tap outside / empty space to close -->
+  <div
+    id="mobile-menu-backdrop"
+    class="fixed inset-0 top-14 sm:top-16 bg-black/50 backdrop-blur-sm z-[-1] hidden md:hidden transition-opacity cursor-pointer"
+    aria-hidden="true"
+  />
 </header>
 
 <script>
+  let headerAbortController: AbortController | null = null;
+
   function initHeader() {
+    // Reset previous listeners to avoid duplicates across page transitions
+    if (headerAbortController) {
+      headerAbortController.abort();
+    }
+    headerAbortController = new AbortController();
+    const { signal } = headerAbortController;
+
     // Clean client-side toggle without framework overhead
     const btn = document.getElementById('mobile-menu-toggle');
     const menu = document.getElementById('mobile-menu');
+    const backdrop = document.getElementById('mobile-menu-backdrop');
     const burgerIcon = document.getElementById('burger-icon');
     const closeIcon = document.getElementById('close-icon');
 
+    const closeMenu = () => {
+      if (!menu || menu.classList.contains('hidden')) return;
+      btn?.setAttribute('aria-expanded', 'false');
+      menu.classList.add('hidden');
+      backdrop?.classList.add('hidden');
+      burgerIcon?.classList.remove('hidden');
+      closeIcon?.classList.add('hidden');
+    };
+
+    const openMenu = () => {
+      if (!menu) return;
+      btn?.setAttribute('aria-expanded', 'true');
+      menu.classList.remove('hidden');
+      backdrop?.classList.remove('hidden');
+      burgerIcon?.classList.add('hidden');
+      closeIcon?.classList.remove('hidden');
+    };
+
     if (btn && menu && burgerIcon && closeIcon) {
-      btn.onclick = () => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
         const isExpanded = btn.getAttribute('aria-expanded') === 'true';
-        btn.setAttribute('aria-expanded', String(!isExpanded));
-        menu.classList.toggle('hidden');
-        burgerIcon.classList.toggle('hidden');
-        closeIcon.classList.toggle('hidden');
+        if (isExpanded) {
+          closeMenu();
+        } else {
+          openMenu();
+        }
       };
+
+      // Tap on empty space / backdrop closes menu
+      if (backdrop) {
+        backdrop.onclick = () => {
+          closeMenu();
+        };
+      }
+
+      // Tap on document outside menu closes menu
+      const handleOutsideTap = (e: Event) => {
+        if (!menu.classList.contains('hidden')) {
+          const target = e.target as Node;
+          if (!menu.contains(target) && !btn.contains(target)) {
+            closeMenu();
+          }
+        }
+      };
+
+      document.addEventListener('click', handleOutsideTap, { signal });
+      document.addEventListener('touchstart', handleOutsideTap, { signal, passive: true });
+
+      // ESC key accessibility
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !menu.classList.contains('hidden')) {
+          closeMenu();
+          btn.focus();
+        }
+      }, { signal });
+
+      // Auto close when navigating via internal link
+      menu.querySelectorAll('a').forEach((link) => {
+        link.addEventListener('click', closeMenu, { signal });
+      });
     }
 
     // Mobile Theme Switcher logic
