@@ -130,15 +130,15 @@ const faqItems = [
 >
   <!-- Hero Section (Content with z-index: 10 on top of fixed canvas and scrims) -->
   <section class="hero-section relative flex flex-col justify-start px-4 sm:px-6 lg:px-8 z-10 overflow-hidden">
-    <!-- 1. Soft ambient radial glow behind house model strictly in Hero (40% quieter) -->
+    <!-- 1. Soft ambient radial glow behind house model strictly in Hero (using theme --bg-glow) -->
     <div
       class="absolute inset-0 pointer-events-none -z-10 hidden min-[900px]:block"
-      style="background: radial-gradient(circle 60vh at 66% 46%, rgba(15, 58, 71, 0.6) 0%, rgba(15, 58, 71, 0.3) 45%, transparent 100%);"
+      style="background: radial-gradient(circle 60vh at 66% 46%, var(--bg-glow) 0%, transparent 75%);"
       aria-hidden="true"
     ></div>
     <div
       class="absolute inset-0 pointer-events-none -z-10 min-[900px]:hidden"
-      style="background: radial-gradient(circle 45vh at 50% 22.5vh, rgba(15, 58, 71, 0.6) 0%, rgba(15, 58, 71, 0.3) 45%, transparent 100%);"
+      style="background: radial-gradient(circle 45vh at 50% 22.5vh, var(--bg-glow) 0%, transparent 75%);"
       aria-hidden="true"
     ></div>
 
@@ -149,10 +149,10 @@ const faqItems = [
       aria-hidden="true"
     ></div>
 
-    <!-- Mobile darkening gradient strictly confined to hero -->
+    <!-- Mobile darkening gradient strictly confined to hero, starting below the house model -->
     <div
       class="absolute inset-0 -z-10 pointer-events-none min-[900px]:hidden"
-      style="background: linear-gradient(to bottom, transparent 0%, transparent clamp(200px, 30svh, 320px), color-mix(in srgb, var(--bg) 90%, transparent) clamp(250px, 36svh, 380px), var(--bg) clamp(300px, 44svh, 460px));"
+      style="background: linear-gradient(to bottom, transparent 0%, transparent clamp(340px, 42svh, 400px), color-mix(in srgb, var(--bg) 85%, transparent) clamp(400px, 50svh, 470px), var(--bg) clamp(460px, 58svh, 540px));"
       aria-hidden="true"
     ></div>
 
