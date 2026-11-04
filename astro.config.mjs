@@ -8,6 +8,9 @@ export default defineConfig({
   site: 'https://stroyraschet.ru',
   output: 'static',
   trailingSlash: 'always',
+  devToolbar: {
+    enabled: false
+  },
   build: {
     format: 'directory'
   },
